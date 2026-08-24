@@ -36,6 +36,7 @@ export default function AdminPage() {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isLoadingInitial, setIsLoadingInitial] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Entities State - Purely loaded from Supabase Database (no hardcoded mock data)
   const [categories, setCategories] = useState<Category[]>([]);
@@ -396,7 +397,7 @@ export default function AdminPage() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans">
-      {/* Sidebar */}
+      {/* Sidebar (Responsive Desktop & Mobile Drawer) */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -404,6 +405,8 @@ export default function AdminPage() {
         currentUserEmail={currentUserEmail}
         currentUserName={currentUserProfile?.full_name || 'Admin Residencial'}
         currentUserAvatar={currentUserProfile?.avatar_url || undefined}
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileClose={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* Main Content Area */}
@@ -418,10 +421,11 @@ export default function AdminPage() {
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           onSignOut={handleSignOut}
+          onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
         />
 
         {/* Dynamic Module Rendering */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 space-y-6">
           {isLoadingInitial ? (
             <div className="h-96 flex flex-col items-center justify-center space-y-4 text-slate-500">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
