@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Tag, Check, FolderTree } from 'lucide-react';
+import {
+  Plus, Edit, Trash2, Tag, Check, FolderTree,
+  Utensils, Coffee, ShoppingBag, Store, Briefcase, HeartPulse,
+  Car, Wrench, Home, Scissors, Sparkles, Film, Gift, Laptop,
+  Truck, Smartphone, Dumbbell, BookOpen, Music, Camera,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -15,8 +21,42 @@ interface CategoriesModuleProps {
   searchTerm: string;
 }
 
-const COLOR_PRESETS = ['#3b82f6','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#64748b'];
-const ICON_PRESETS = ['Utensils','Coffee','Laptop','ShoppingBag','Briefcase','HeartPulse','Car','Film','Gift','Home'];
+const COLOR_PRESETS = [
+  '#3b82f6', '#06b6d4', '#10b981', '#f59e0b',
+  '#ef4444', '#8b5cf6', '#ec4899', '#64748b'
+];
+
+export const AVAILABLE_ICONS: { name: string; label: string; icon: LucideIcon }[] = [
+  { name: 'Utensils', label: 'Restaurantes', icon: Utensils },
+  { name: 'Coffee', label: 'Cafeterías', icon: Coffee },
+  { name: 'ShoppingBag', label: 'Tiendas', icon: ShoppingBag },
+  { name: 'Store', label: 'Supermercado', icon: Store },
+  { name: 'Briefcase', label: 'Servicios', icon: Briefcase },
+  { name: 'HeartPulse', label: 'Salud', icon: HeartPulse },
+  { name: 'Car', label: 'Automotriz', icon: Car },
+  { name: 'Wrench', label: 'Mantenimiento', icon: Wrench },
+  { name: 'Home', label: 'Hogar', icon: Home },
+  { name: 'Scissors', label: 'Belleza', icon: Scissors },
+  { name: 'Sparkles', label: 'Limpieza', icon: Sparkles },
+  { name: 'Film', label: 'Entretenimiento', icon: Film },
+  { name: 'Gift', label: 'Regalos', icon: Gift },
+  { name: 'Laptop', label: 'Tecnología', icon: Laptop },
+  { name: 'Truck', label: 'Envíos / Delivery', icon: Truck },
+  { name: 'Smartphone', label: 'Telefonía', icon: Smartphone },
+  { name: 'Dumbbell', label: 'Deportes / Gym', icon: Dumbbell },
+  { name: 'BookOpen', label: 'Educación', icon: BookOpen },
+  { name: 'Music', label: 'Música / Eventos', icon: Music },
+  { name: 'Camera', label: 'Fotografía', icon: Camera },
+];
+
+export function renderCategoryIcon(iconName?: string, className = 'w-4 h-4') {
+  const found = AVAILABLE_ICONS.find((item) => item.name.toLowerCase() === (iconName || '').toLowerCase());
+  if (found) {
+    const IconComponent = found.icon;
+    return <IconComponent className={className} />;
+  }
+  return <Tag className={className} />;
+}
 
 export default function CategoriesModule({ categories, onSaveCategory, onDeleteCategory, searchTerm }: CategoriesModuleProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -52,7 +92,7 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
   const openEditModal = (cat: Category) => {
     setEditingCategory(cat);
     setId(cat.id); setName(cat.name); setSlug(cat.slug);
-    setColor(cat.color || '#3b82f6'); setIcon(cat.icon);
+    setColor(cat.color || '#3b82f6'); setIcon(cat.icon || 'Utensils');
     setIsOpen(true);
   };
 
@@ -104,7 +144,7 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
                 <th className="py-3.5 px-4">NOMBRE</th>
                 <th className="py-3.5 px-4">CÓDIGO</th>
                 <th className="py-3.5 px-4">COLOR DISTINTIVO</th>
-                <th className="py-3.5 px-4">ÍCONO</th>
+                <th className="py-3.5 px-4">ÍCONO VISUAL</th>
                 <th className="py-3.5 px-4 text-right">ACCIONES</th>
               </tr>
             </thead>
@@ -115,7 +155,7 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
                 paginatedCategories.map((cat) => (
                   <tr key={cat.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-slate-900">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
                         <span className="w-3.5 h-3.5 rounded-full inline-block shrink-0" style={{ backgroundColor: cat.color || '#3b82f6' }} />
                         <span>{cat.name}</span>
                       </div>
@@ -129,8 +169,16 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
                         <span>{cat.color}</span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-slate-600">
-                      <div className="flex items-center gap-2"><Tag className="w-4 h-4 text-blue-600" /><span>{cat.icon}</span></div>
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 shadow-xs"
+                          style={{ backgroundColor: cat.color || '#3b82f6' }}
+                        >
+                          {renderCategoryIcon(cat.icon, 'w-3.5 h-3.5')}
+                        </div>
+                        <span className="font-semibold text-slate-700">{cat.icon}</span>
+                      </div>
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex justify-end space-x-2">
@@ -189,15 +237,48 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
               </div>
               <Input value={color} onChange={(e) => setColor(e.target.value)} />
             </div>
+
+            {/* Visual Icon Grid Selector */}
             <div>
-              <label className="block text-xs font-semibold mb-2 text-slate-700">Ícono Visual</label>
-              <div className="grid grid-cols-5 gap-2">
-                {ICON_PRESETS.map((ic) => (
-                  <Button key={ic} onClick={() => setIcon(ic)} variant={icon === ic ? 'default' : 'secondary'}
-                    className={`h-8 text-xs font-semibold rounded-lg ${icon === ic ? 'bg-blue-600 text-white hover:bg-blue-500' : ''}`}>
-                    {ic}
-                  </Button>
-                ))}
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-slate-700 block">
+                  Ícono Visual de la Categoría
+                </label>
+                <span className="text-[11px] font-bold text-blue-600 flex items-center gap-1">
+                  Seleccionado: <strong className="font-mono">{icon}</strong>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-h-56 overflow-y-auto p-1.5 border border-slate-200 rounded-xl bg-slate-50/50">
+                {AVAILABLE_ICONS.map((item) => {
+                  const IconComp = item.icon;
+                  const isSelected = icon.toLowerCase() === item.name.toLowerCase();
+                  return (
+                    <button
+                      type="button"
+                      key={item.name}
+                      onClick={() => setIcon(item.name)}
+                      className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all ${
+                        isSelected
+                          ? 'border-blue-600 bg-blue-50 text-blue-700 font-bold shadow-xs scale-105 ring-2 ring-blue-500/20'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                      }`}
+                      title={item.label}
+                    >
+                      <div
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center mb-1 transition-colors ${
+                          isSelected ? 'text-white' : 'text-slate-600 bg-slate-100'
+                        }`}
+                        style={{ backgroundColor: isSelected ? color || '#3b82f6' : undefined }}
+                      >
+                        <IconComp className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] leading-tight truncate w-full text-center">
+                        {item.label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
