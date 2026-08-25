@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/ui/table-pagination';
+import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { Promotion, Business, Category } from '@/types/database';
 
 interface PromotionsModuleProps {
@@ -193,10 +194,12 @@ export default function PromotionsModule({ promotions, businesses, categories, o
                 <Input placeholder="Popular" value={ribbon} onChange={(e) => setRibbon(e.target.value)} />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-slate-700 text-xs font-semibold block">Imagen de la Promoción (enlace web)</label>
-              <Input placeholder="https://..." value={image} onChange={(e) => setImage(e.target.value)} />
-            </div>
+            <ImageDropzone
+              label="Imagen de la Promoción"
+              value={image}
+              onChange={setImage}
+              folder="promotions"
+            />
             <div className="space-y-1.5">
               <label className="text-slate-700 text-xs font-semibold block">Descripción de la Oferta</label>
               <Textarea placeholder="Escribe las condiciones o detalles del aviso" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />

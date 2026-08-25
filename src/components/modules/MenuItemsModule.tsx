@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/ui/table-pagination';
+import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { MenuItem, Business } from '@/types/database';
 
 interface MenuItemsModuleProps {
@@ -191,16 +192,16 @@ export default function MenuItemsModule({ menuItems, businesses, onSaveMenuItem,
                 <Input placeholder="Ej. Platos Fuertes" value={category} onChange={(e) => setCategory(e.target.value)} required />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-slate-700 text-xs font-semibold block">Precio ($)</label>
-                <Input placeholder="150.00" type="number" step="0.5" value={String(price)} onChange={(e) => setPrice(Number(e.target.value))} required />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-slate-700 text-xs font-semibold block">Foto del Producto (enlace web)</label>
-                <Input placeholder="https://..." value={image} onChange={(e) => setImage(e.target.value)} />
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-slate-700 text-xs font-semibold block">Precio ($)</label>
+              <Input placeholder="150.00" type="number" step="0.5" value={String(price)} onChange={(e) => setPrice(Number(e.target.value))} required />
             </div>
+            <ImageDropzone
+              label="Foto del Producto"
+              value={image}
+              onChange={setImage}
+              folder="menu"
+            />
             <div className="space-y-1.5">
               <label className="text-slate-700 text-xs font-semibold block">Descripción o Ingredientes</label>
               <Textarea placeholder="Escribe los ingredientes o detalles del platillo" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/ui/table-pagination';
+import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { Business, Category } from '@/types/database';
 
 interface BusinessesModuleProps {
@@ -261,15 +262,19 @@ export default function BusinessesModule({
               <Input placeholder="Ej. Sector 2, Frente al Parque Principal" value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-slate-700 text-xs font-semibold block">Foto Principal (enlace web)</label>
-                <Input placeholder="https://..." value={image} onChange={(e) => setImage(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-slate-700 text-xs font-semibold block">Logo del Comercio (enlace web)</label>
-                <Input placeholder="https://..." value={logo} onChange={(e) => setLogo(e.target.value)} />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ImageDropzone
+                label="Foto Principal del Comercio"
+                value={image}
+                onChange={setImage}
+                folder="businesses"
+              />
+              <ImageDropzone
+                label="Logo del Comercio"
+                value={logo}
+                onChange={setLogo}
+                folder="logos"
+              />
             </div>
 
             <div className="flex items-center space-x-6 pt-2">

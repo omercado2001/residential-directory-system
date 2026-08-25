@@ -10,7 +10,6 @@ import BusinessesModule from '@/components/modules/BusinessesModule';
 import MenuItemsModule from '@/components/modules/MenuItemsModule';
 import PromotionsModule from '@/components/modules/PromotionsModule';
 import ProfilesModule from '@/components/modules/ProfilesModule';
-import FavoritesModule from '@/components/modules/FavoritesModule';
 import LogsModule from '@/components/modules/LogsModule';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
@@ -21,7 +20,6 @@ import {
   Business,
   MenuItem,
   Promotion,
-  UserFavorite,
   Profile,
   AppLog,
 } from '@/types/database';
@@ -43,7 +41,6 @@ export default function AdminPage() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
-  const [userFavorites, setUserFavorites] = useState<UserFavorite[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [appLogs, setAppLogs] = useState<AppLog[]>([]);
 
@@ -60,7 +57,6 @@ export default function AdminPage() {
         { data: bizData, error: bizError },
         { data: menuData, error: menuError },
         { data: promoData, error: promoError },
-        { data: favData, error: favError },
         { data: profData, error: profError },
         { data: logData, error: logError },
       ] = await Promise.all([
@@ -68,7 +64,6 @@ export default function AdminPage() {
         supabase.from('businesses').select('*').order('name', { ascending: true }),
         supabase.from('menu_items').select('*').order('name', { ascending: true }),
         supabase.from('promotions').select('*').order('created_at', { ascending: false }),
-        supabase.from('user_favorites').select('*'),
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('app_logs').select('*').order('created_at', { ascending: false }),
       ]);
@@ -77,7 +72,6 @@ export default function AdminPage() {
       if (bizError) console.warn('businesses fetch:', bizError.message);
       if (menuError) console.warn('menu_items fetch:', menuError.message);
       if (promoError) console.warn('promotions fetch:', promoError.message);
-      if (favError) console.warn('user_favorites fetch:', favError.message);
       if (profError) console.warn('profiles fetch:', profError.message);
       if (logError) console.warn('app_logs fetch:', logError.message);
 
@@ -85,7 +79,6 @@ export default function AdminPage() {
       setBusinesses(bizData || []);
       setMenuItems(menuData || []);
       setPromotions(promoData || []);
-      setUserFavorites(favData || []);
       if (profData && profData.length > 0) {
         setProfiles(profData);
         const activeProf = profData.find((p) => p.role === 'admin') || profData[0];
@@ -315,35 +308,6 @@ export default function AdminPage() {
     }
   };
 
-  // Favorites CRUD
-  const handleSaveFavorite = async (fav: UserFavorite) => {
-    try {
-      const { error } = await supabase.from('user_favorites').upsert(fav);
-      if (error) {
-        toast.error(`Error al vincular favorito en Supabase: ${error.message}`);
-        return;
-      }
-      toast.success('Favorito vinculado con éxito');
-      await loadData();
-    } catch (err: any) {
-      toast.error(`Error: ${err?.message || 'Fallo al guardar'}`);
-    }
-  };
-
-  const handleDeleteFavorite = async (userId: string, businessId: string) => {
-    try {
-      const { error } = await supabase.from('user_favorites').delete().match({ user_id: userId, business_id: businessId });
-      if (error) {
-        toast.error(`Error al eliminar favorito: ${error.message}`);
-        return;
-      }
-      toast.success('Favorito eliminado con éxito');
-      await loadData();
-    } catch (err: any) {
-      toast.error(`Error: ${err?.message || 'Fallo al eliminar'}`);
-    }
-  };
-
   // Logs CRUD
   const handleAddLog = async (log: AppLog) => {
     try {
@@ -491,17 +455,6 @@ export default function AdminPage() {
                   profiles={profiles}
                   onSaveProfile={handleSaveProfile}
                   onDeleteProfile={handleDeleteProfile}
-                  searchTerm={searchTerm}
-                />
-              )}
-
-              {activeTab === 'favorites' && (
-                <FavoritesModule
-                  favorites={userFavorites}
-                  profiles={profiles}
-                  businesses={businesses}
-                  onSaveFavorite={handleSaveFavorite}
-                  onDeleteFavorite={handleDeleteFavorite}
                   searchTerm={searchTerm}
                 />
               )}

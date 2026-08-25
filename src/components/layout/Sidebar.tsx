@@ -3,7 +3,7 @@
 import React from 'react';
 import {
   LayoutDashboard, FolderTree, Building2, UtensilsCrossed,
-  Tag, Users, Heart, Terminal, ShieldCheck, Building, X,
+  Tag, Users, Terminal, ShieldCheck, Building, X,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ export type AdminTab =
   | 'menu_items'
   | 'promotions'
   | 'profiles'
-  | 'favorites'
   | 'logs';
 
 interface SidebarProps {
@@ -53,7 +52,6 @@ export default function Sidebar({
     { id: 'menu_items' as AdminTab, label: 'Productos y Menú', icon: UtensilsCrossed, badge: counts.menuItems },
     { id: 'promotions' as AdminTab, label: 'Avisos y Ofertas', icon: Tag, badge: counts.promotions, isNew: true },
     { id: 'profiles' as AdminTab, label: 'Residentes', icon: Users, badge: counts.profiles },
-    { id: 'favorites' as AdminTab, label: 'Favoritos', icon: Heart, badge: null },
     { id: 'logs' as AdminTab, label: 'Historial y Alertas', icon: Terminal, badge: counts.logs, danger: counts.logs > 0 },
   ];
 

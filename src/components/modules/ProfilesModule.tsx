@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/ui/table-pagination';
+import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { Profile } from '@/types/database';
 
 interface ProfilesModuleProps {
@@ -176,10 +177,12 @@ export default function ProfilesModule({ profiles, onSaveProfile, onDeleteProfil
                 {ROLES.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-slate-700 text-xs font-semibold block">Foto de Perfil (enlace web)</label>
-              <Input placeholder="https://..." value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} />
-            </div>
+            <ImageDropzone
+              label="Foto de Perfil"
+              value={avatarUrl}
+              onChange={setAvatarUrl}
+              folder="avatars"
+            />
           </div>
           <DialogFooter>
             <Button onClick={() => setIsModalOpen(false)} variant="secondary" className="rounded-full font-semibold text-xs">Cancelar</Button>
