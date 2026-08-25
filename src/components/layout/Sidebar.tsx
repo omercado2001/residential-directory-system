@@ -3,10 +3,11 @@
 import React from 'react';
 import {
   LayoutDashboard, FolderTree, Building2, UtensilsCrossed,
-  Tag, Users, Terminal, ShieldCheck, Building, X,
+  Tag, Users, Terminal, ShieldCheck, Building, X, Shield, Edit3, Eye, HardDrive, Calendar
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { UserRole, getRoleLabel } from '@/types/roles';
 
 export type AdminTab =
   | 'overview'
@@ -14,6 +15,8 @@ export type AdminTab =
   | 'businesses'
   | 'menu_items'
   | 'promotions'
+  | 'events'
+  | 'storage'
   | 'profiles'
   | 'logs';
 
@@ -25,12 +28,14 @@ interface SidebarProps {
     businesses: number;
     menuItems: number;
     promotions: number;
+    events: number;
     profiles: number;
     logs: number;
   };
   currentUserEmail?: string;
   currentUserName?: string;
   currentUserAvatar?: string;
+  userRole?: UserRole;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
 }
@@ -42,23 +47,62 @@ export default function Sidebar({
   currentUserEmail = '',
   currentUserName = 'Administrador',
   currentUserAvatar,
+  userRole = 'admin',
   isMobileOpen = false,
   onMobileClose,
 }: SidebarProps) {
-  const menuItems = [
-    { id: 'overview' as AdminTab, label: 'Panel Principal', icon: LayoutDashboard, badge: null },
-    { id: 'categories' as AdminTab, label: 'Categorías', icon: FolderTree, badge: counts.categories },
-    { id: 'businesses' as AdminTab, label: 'Comercios', icon: Building2, badge: counts.businesses },
-    { id: 'menu_items' as AdminTab, label: 'Productos y Menú', icon: UtensilsCrossed, badge: counts.menuItems },
-    { id: 'promotions' as AdminTab, label: 'Avisos y Ofertas', icon: Tag, badge: counts.promotions, isNew: true },
-    { id: 'profiles' as AdminTab, label: 'Residentes', icon: Users, badge: counts.profiles },
-    { id: 'logs' as AdminTab, label: 'Historial y Alertas', icon: Terminal, badge: counts.logs, danger: counts.logs > 0 },
+  // All possible menu items
+  const allMenuItems = [
+    { id: 'overview' as AdminTab, label: 'Panel Principal', icon: LayoutDashboard, badge: null, adminOnly: false },
+    { id: 'categories' as AdminTab, label: 'Categorías', icon: FolderTree, badge: counts.categories, adminOnly: false },
+    { id: 'businesses' as AdminTab, label: 'Comercios', icon: Building2, badge: counts.businesses, adminOnly: false },
+    { id: 'menu_items' as AdminTab, label: 'Productos y Menú', icon: UtensilsCrossed, badge: counts.menuItems, adminOnly: false },
+    { id: 'promotions' as AdminTab, label: 'Avisos y Ofertas', icon: Tag, badge: counts.promotions, adminOnly: false },
+    { id: 'events' as AdminTab, label: 'Eventos Residenciales', icon: Calendar, badge: counts.events, isNew: true, adminOnly: false },
+    { id: 'storage' as AdminTab, label: 'Galería de Archivos', icon: HardDrive, badge: null, adminOnly: false },
+    { id: 'profiles' as AdminTab, label: 'Residentes / Usuarios', icon: Users, badge: counts.profiles, adminOnly: true },
+    { id: 'logs' as AdminTab, label: 'Historial y Alertas', icon: Terminal, badge: counts.logs, danger: counts.logs > 0, adminOnly: true },
   ];
+
+  // Filter items based on user role: if not admin, hide adminOnly tabs
+  const visibleMenuItems = allMenuItems.filter((item) => {
+    if (item.adminOnly && userRole !== 'admin') {
+      return false;
+    }
+    return true;
+  });
 
   const handleTabClick = (tabId: AdminTab) => {
     setActiveTab(tabId);
     if (onMobileClose) {
       onMobileClose();
+    }
+  };
+
+  const getRoleBadge = () => {
+    switch (userRole) {
+      case 'admin':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold border border-purple-200">
+            <Shield className="w-3 h-3" />
+            <span>Admin Total</span>
+          </span>
+        );
+      case 'editor':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold border border-blue-200">
+            <Edit3 className="w-3 h-3" />
+            <span>Editor Gestor</span>
+          </span>
+        );
+      case 'viewer':
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold border border-slate-200">
+            <Eye className="w-3 h-3" />
+            <span>Solo Lectura</span>
+          </span>
+        );
     }
   };
 
@@ -92,32 +136,31 @@ export default function Sidebar({
           )}
         </div>
 
+        {/* Current User & Role Profile Box */}
         <div className="pt-3 border-t border-slate-100 flex items-center space-x-3">
           {currentUserAvatar ? (
             <img
               src={currentUserAvatar}
               alt="Admin"
-              className="w-8 h-8 rounded-full object-cover border border-blue-500 shrink-0"
+              className="w-9 h-9 rounded-full object-cover border border-blue-500 shrink-0"
             />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center border border-blue-400 shrink-0">
+            <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center border border-blue-400 shrink-0 shadow-xs">
               {(currentUserName || currentUserEmail || 'A').slice(0, 1).toUpperCase()}
             </div>
           )}
-          <div className="flex flex-col min-w-0">
-            <span className="text-xs font-bold text-slate-900 truncate max-w-[140px]">
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-xs font-bold text-slate-900 truncate max-w-[130px]" title={currentUserName}>
               {currentUserName || 'Administrador'}
             </span>
-            <span className="text-[10px] text-slate-500 font-medium truncate max-w-[140px]">
-              {currentUserEmail || 'Conectado a BD'}
-            </span>
+            <div className="mt-0.5">{getRoleBadge()}</div>
           </div>
         </div>
       </div>
 
       {/* Navigation List */}
       <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
-        {menuItems.map((item) => {
+        {visibleMenuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
@@ -162,12 +205,18 @@ export default function Sidebar({
         <Card className="bg-slate-50 border border-slate-200 shadow-none">
           <CardContent className="p-3 space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-800">Estado de Conexión</span>
+              <span className="font-bold text-slate-800">Rol: {getRoleLabel(userRole)}</span>
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
             </div>
             <div className="text-[11px] text-slate-600 flex items-center gap-1.5 font-medium">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Base de Datos Conectada</span>
+              <span>
+                {userRole === 'admin'
+                  ? 'Acceso Total a Todas las Secciones'
+                  : userRole === 'editor'
+                  ? 'Permisos Totales en 4 Secciones'
+                  : 'Solo Consulta de 4 Secciones'}
+              </span>
             </div>
           </CardContent>
         </Card>

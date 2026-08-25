@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Tag, Plus, Edit, Trash2, Calendar, Building2 } from 'lucide-react';
+import { Tag, Plus, Edit, Trash2, Calendar, Building2, ImageOff } from 'lucide-react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { ImageDropzone } from '@/components/ui/image-dropzone';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Promotion, Business, Category } from '@/types/database';
+import { toast } from 'sonner';
 
 interface PromotionsModuleProps {
   promotions: Promotion[];
@@ -18,11 +20,24 @@ interface PromotionsModuleProps {
   onSavePromotion: (promo: Promotion) => Promise<void>;
   onDeletePromotion: (id: string) => Promise<void>;
   searchTerm: string;
+  canEdit?: boolean;
 }
 
-export default function PromotionsModule({ promotions, businesses, categories, onSavePromotion, onDeletePromotion, searchTerm }: PromotionsModuleProps) {
+export default function PromotionsModule({
+  promotions,
+  businesses,
+  categories,
+  onSavePromotion,
+  onDeletePromotion,
+  searchTerm,
+  canEdit = true,
+}: PromotionsModuleProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<Promotion | null>(null);
+
+  // Confirmation state
+  const [confirmDeletePromo, setConfirmDeletePromo] = useState<Promotion | null>(null);
+  const [confirmUpdatePayload, setConfirmUpdatePayload] = useState<Promotion | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -33,6 +48,7 @@ export default function PromotionsModule({ promotions, businesses, categories, o
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [badge, setBadge] = useState('');
+  const [badgeColor, setBadgeColor] = useState('#ef4444');
   const [validUntil, setValidUntil] = useState('');
   const [image, setImage] = useState('');
   const [ribbon, setRibbon] = useState('');
@@ -50,31 +66,95 @@ export default function PromotionsModule({ promotions, businesses, categories, o
 
   const openCreateModal = () => {
     setEditingPromo(null);
-    setBusinessId(businesses[0]?.id || ''); setCategoryId(categories[0]?.id || '');
-    setTitle(''); setDescription(''); setBadge(''); setValidUntil(''); setImage(''); setRibbon('');
+    const initialBiz = businesses[0];
+    const initialCat = initialBiz?.category_id || categories[0]?.id || '';
+    setBusinessId(initialBiz?.id || '');
+    setCategoryId(initialCat);
+    setTitle('');
+    setDescription('');
+    setBadge('');
+    setBadgeColor('#ef4444');
+    setValidUntil('');
+    setImage('');
+    setRibbon('');
     setIsModalOpen(true);
   };
 
   const openEditModal = (p: Promotion) => {
     setEditingPromo(p);
-    setBusinessId(p.business_id); setCategoryId(p.category_id || '');
-    setTitle(p.title); setDescription(p.description || ''); setBadge(p.badge || '');
+    setBusinessId(p.business_id);
+    setCategoryId(p.category_id || '');
+    setTitle(p.title);
+    setDescription(p.description || '');
+    setBadge(p.badge || '');
+    setBadgeColor(p.badge_color || '#ef4444');
     setValidUntil(p.valid_until ? p.valid_until.split('T')[0] : '');
-    setImage(p.image || ''); setRibbon(p.ribbon || '');
+    setImage(p.image || '');
+    setRibbon(p.ribbon || '');
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async () => {
-    if (!title || !businessId) return;
+  const handleBusinessChange = (selectedBizId: string) => {
+    setBusinessId(selectedBizId);
+    const biz = businesses.find((b) => b.id === selectedBizId);
+    if (biz?.category_id) {
+      setCategoryId(biz.category_id);
+    }
+  };
+
+  const handleFormSubmit = async () => {
+    const trimmedTitle = title.trim();
+    const finalBizId = businessId || businesses[0]?.id;
+
+    if (!trimmedTitle) {
+      toast.error('Por favor ingresa el título de la promoción');
+      return;
+    }
+
+    if (!finalBizId) {
+      toast.error('Debes seleccionar un comercio para la promoción');
+      return;
+    }
+
+    const selectedBiz = businesses.find((b) => b.id === finalBizId);
+    const finalCatId = categoryId || selectedBiz?.category_id || categories[0]?.id || '';
+
+    // Date formatted as YYYY-MM-DD for PostgreSQL DATE column
+    const formattedDate = validUntil ? validUntil.split('T')[0] : null;
+
     const payload: Promotion = {
       id: editingPromo?.id || crypto.randomUUID(),
-      business_id: businessId, category_id: categoryId, title, description,
-      badge, valid_until: validUntil ? new Date(validUntil).toISOString() : null,
-      image, ribbon,
+      business_id: finalBizId,
+      category_id: finalCatId,
+      title: trimmedTitle,
+      description: description.trim() || null,
+      badge: badge.trim() || null,
+      badge_color: badgeColor || '#ef4444',
+      valid_until: formattedDate,
+      image: image || null,
+      ribbon: ribbon.trim() || null,
       created_at: editingPromo?.created_at || new Date().toISOString(),
     };
-    await onSavePromotion(payload);
+
+    if (editingPromo) {
+      setConfirmUpdatePayload(payload);
+    } else {
+      await onSavePromotion(payload);
+      setIsModalOpen(false);
+    }
+  };
+
+  const executeUpdate = async () => {
+    if (!confirmUpdatePayload) return;
+    await onSavePromotion(confirmUpdatePayload);
+    setConfirmUpdatePayload(null);
     setIsModalOpen(false);
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDeletePromo) return;
+    await onDeletePromotion(confirmDeletePromo.id);
+    setConfirmDeletePromo(null);
   };
 
   return (
@@ -87,9 +167,15 @@ export default function PromotionsModule({ promotions, businesses, categories, o
           </h2>
           <p className="text-xs text-slate-500 mt-1">Ofertas y campañas activas ({promotions.length})</p>
         </div>
-        <Button onClick={openCreateModal} className="font-bold shadow-md bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 h-9 flex items-center gap-2">
-          <Plus className="w-4 h-4" /><span>Nueva Promoción</span>
-        </Button>
+        {canEdit ? (
+          <Button onClick={openCreateModal} className="font-bold shadow-md bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 h-9 flex items-center gap-2">
+            <Plus className="w-4 h-4" /><span>Nueva Promoción</span>
+          </Button>
+        ) : (
+          <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">
+            Modo Solo Consulta
+          </span>
+        )}
       </div>
 
       {/* Cards Grid */}
@@ -102,40 +188,76 @@ export default function PromotionsModule({ promotions, businesses, categories, o
           paginatedPromotions.map((promo) => {
             const business = businesses.find((b) => b.id === promo.business_id);
             return (
-              <Card key={promo.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col shadow-xs">
-                {promo.image && (
-                  <div className="relative h-36 w-full bg-slate-100 overflow-hidden">
+              <Card key={promo.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col shadow-xs hover:border-slate-300 transition-all">
+                {promo.image ? (
+                  <div className="relative h-40 w-full bg-slate-100 overflow-hidden">
                     <img src={promo.image} alt={promo.title} className="w-full h-full object-cover" />
                     {promo.ribbon && (
-                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-600 text-white shadow-md">{promo.ribbon}</span>
+                      <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-600 text-white shadow-md">
+                        {promo.ribbon}
+                      </span>
                     )}
                     {promo.badge && (
-                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500 text-white shadow-md">{promo.badge}</span>
+                      <span
+                        className="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-extrabold text-white shadow-md"
+                        style={{ backgroundColor: promo.badge_color || '#ef4444' }}
+                      >
+                        {promo.badge}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="relative h-28 w-full bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-rose-500/10 border-b border-slate-200 flex items-center justify-between p-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                        <Tag className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700">{business?.name || 'Comercio'}</span>
+                    </div>
+                    {promo.badge && (
+                      <span
+                        className="px-2 py-0.5 rounded-md text-[10px] font-extrabold text-white shadow-xs"
+                        style={{ backgroundColor: promo.badge_color || '#ef4444' }}
+                      >
+                        {promo.badge}
+                      </span>
                     )}
                   </div>
                 )}
-                <CardContent className="p-5 flex-1 space-y-2">
-                  <h3 className="font-bold text-base text-slate-900 truncate">{promo.title}</h3>
-                  {promo.description && <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{promo.description}</p>}
-                  <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                    <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>{business?.name || 'Comercio'}</span>
-                  </div>
-                  {promo.valid_until && (
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                      <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                      <span>Válido hasta: {new Date(promo.valid_until).toLocaleDateString()}</span>
-                    </div>
+
+                <CardContent className="p-5 flex-1 space-y-2.5">
+                  <h3 className="font-bold text-base text-slate-900 truncate" title={promo.title}>
+                    {promo.title}
+                  </h3>
+                  {promo.description ? (
+                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{promo.description}</p>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">Sin descripción</p>
                   )}
+                  <div className="space-y-1 pt-1 text-[11px] text-slate-500">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="font-semibold text-slate-700 truncate">{business?.name || 'Comercio'}</span>
+                    </div>
+                    {promo.valid_until && (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span>Válido hasta: {promo.valid_until}</span>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
-                <CardFooter className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end space-x-2">
-                  <Button onClick={() => openEditModal(promo)} className="px-3 h-8 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5" variant="ghost">
-                    <Edit className="w-3.5 h-3.5" /><span>Editar</span>
-                  </Button>
-                  <Button onClick={() => onDeletePromotion(promo.id)} className="w-8 h-8 p-0 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg" variant="ghost">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </CardFooter>
+
+                {canEdit && (
+                  <CardFooter className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end space-x-2">
+                    <Button onClick={() => openEditModal(promo)} className="px-3 h-8 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5" variant="ghost">
+                      <Edit className="w-3.5 h-3.5" /><span>Editar</span>
+                    </Button>
+                    <Button onClick={() => setConfirmDeletePromo(promo)} className="w-8 h-8 p-0 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg" variant="ghost">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </CardFooter>
+                )}
               </Card>
             );
           })
@@ -164,25 +286,33 @@ export default function PromotionsModule({ promotions, businesses, categories, o
               <label className="text-slate-700 text-xs font-semibold block">Título de la Promoción</label>
               <Input placeholder="Ej. 2x1 en Tajadas con Queso" value={title} onChange={(e) => setTitle(e.target.value)} required />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-slate-700 text-xs font-semibold block">Comercio</label>
-                <select value={businessId} onChange={(e) => setBusinessId(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900">
+                <select
+                  value={businessId}
+                  onChange={(e) => handleBusinessChange(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                >
                   {businesses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </div>
               <div className="space-y-1.5">
                 <label className="text-slate-700 text-xs font-semibold block">Categoría</label>
-                <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900">
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className="w-full h-9 px-3 rounded-md border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                >
                   {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
             </div>
+
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <label className="text-slate-700 text-xs font-semibold block">Etiqueta (ej. 2x1 / 20% OFF)</label>
+                <label className="text-slate-700 text-xs font-semibold block">Etiqueta (ej. 2x1)</label>
                 <Input placeholder="2x1" value={badge} onChange={(e) => setBadge(e.target.value)} />
               </div>
               <div className="space-y-1.5">
@@ -194,23 +324,54 @@ export default function PromotionsModule({ promotions, businesses, categories, o
                 <Input placeholder="Popular" value={ribbon} onChange={(e) => setRibbon(e.target.value)} />
               </div>
             </div>
+
             <ImageDropzone
               label="Imagen de la Promoción"
               value={image}
               onChange={setImage}
               folder="promotions"
+              businessId={businessId}
+              businessName={businesses.find((b) => b.id === businessId)?.name || 'Comercio'}
             />
+
             <div className="space-y-1.5">
               <label className="text-slate-700 text-xs font-semibold block">Descripción de la Oferta</label>
               <Textarea placeholder="Escribe las condiciones o detalles del aviso" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
             </div>
           </div>
+
           <DialogFooter>
             <Button onClick={() => setIsModalOpen(false)} variant="secondary" className="rounded-full font-semibold text-xs">Cancelar</Button>
-            <Button onClick={handleSubmit} className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs">Guardar Promoción</Button>
+            <Button onClick={handleFormSubmit} className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs">
+              {editingPromo ? 'Actualizar Promoción' : 'Guardar Promoción'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog for Delete */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmDeletePromo)}
+        onClose={() => setConfirmDeletePromo(null)}
+        onConfirm={executeDelete}
+        title="¿Eliminar Promoción?"
+        description={`¿Estás seguro de que deseas eliminar la promoción "${confirmDeletePromo?.title}"? Esta acción no se puede deshacer.`}
+        confirmText="Sí, Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
+
+      {/* Confirmation Dialog for Update */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmUpdatePayload)}
+        onClose={() => setConfirmUpdatePayload(null)}
+        onConfirm={executeUpdate}
+        title="¿Actualizar Promoción?"
+        description={`¿Deseas guardar los cambios realizados en la promoción "${confirmUpdatePayload?.title}"?`}
+        confirmText="Sí, Actualizar"
+        cancelText="Cancelar"
+        variant="primary"
+      />
     </div>
   );
 }

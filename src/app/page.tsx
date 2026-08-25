@@ -9,6 +9,8 @@ import CategoriesModule from '@/components/modules/CategoriesModule';
 import BusinessesModule from '@/components/modules/BusinessesModule';
 import MenuItemsModule from '@/components/modules/MenuItemsModule';
 import PromotionsModule from '@/components/modules/PromotionsModule';
+import EventsModule from '@/components/modules/EventsModule';
+import StorageModule from '@/components/modules/StorageModule';
 import ProfilesModule from '@/components/modules/ProfilesModule';
 import LogsModule from '@/components/modules/LogsModule';
 import { toast } from 'sonner';
@@ -20,14 +22,19 @@ import {
   Business,
   MenuItem,
   Promotion,
+  CommunityEvent,
   Profile,
   AppLog,
 } from '@/types/database';
+import { UserRole, normalizeRole, getRolePermissions } from '@/types/roles';
 
 export default function AdminPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>('admin@residencial.com');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
+  const [currentUserName, setCurrentUserName] = useState<string>('');
   const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>('viewer');
 
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -36,11 +43,14 @@ export default function AdminPage() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
-  // Entities State - Purely loaded from Supabase Database (no hardcoded mock data)
+  const permissions = getRolePermissions(userRole);
+
+  // Entities State - Purely loaded from Supabase Database
   const [categories, setCategories] = useState<Category[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
+  const [events, setEvents] = useState<CommunityEvent[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [appLogs, setAppLogs] = useState<AppLog[]>([]);
 
@@ -57,6 +67,7 @@ export default function AdminPage() {
         { data: bizData, error: bizError },
         { data: menuData, error: menuError },
         { data: promoData, error: promoError },
+        { data: eventsData, error: eventsError },
         { data: profData, error: profError },
         { data: logData, error: logError },
       ] = await Promise.all([
@@ -64,6 +75,7 @@ export default function AdminPage() {
         supabase.from('businesses').select('*').order('name', { ascending: true }),
         supabase.from('menu_items').select('*').order('name', { ascending: true }),
         supabase.from('promotions').select('*').order('created_at', { ascending: false }),
+        supabase.from('events').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('app_logs').select('*').order('created_at', { ascending: false }),
       ]);
@@ -72,6 +84,7 @@ export default function AdminPage() {
       if (bizError) console.warn('businesses fetch:', bizError.message);
       if (menuError) console.warn('menu_items fetch:', menuError.message);
       if (promoError) console.warn('promotions fetch:', promoError.message);
+      if (eventsError) console.warn('events fetch:', eventsError.message);
       if (profError) console.warn('profiles fetch:', profError.message);
       if (logError) console.warn('app_logs fetch:', logError.message);
 
@@ -79,12 +92,18 @@ export default function AdminPage() {
       setBusinesses(bizData || []);
       setMenuItems(menuData || []);
       setPromotions(promoData || []);
+      setEvents(eventsData || []);
       if (profData && profData.length > 0) {
         setProfiles(profData);
-        const activeProf = profData.find((p) => p.role === 'admin') || profData[0];
-        if (activeProf) {
-          setCurrentUserProfile(activeProf);
-          if (activeProf.email) setCurrentUserEmail(activeProf.email);
+        if (currentUserEmail) {
+          const matched = profData.find(
+            (p) => p.email?.toLowerCase() === currentUserEmail.toLowerCase()
+          );
+          if (matched) {
+            setCurrentUserProfile(matched);
+            if (matched.full_name) setCurrentUserName(matched.full_name);
+            setUserRole(normalizeRole(matched.role));
+          }
         }
       } else {
         setProfiles([]);
@@ -92,7 +111,7 @@ export default function AdminPage() {
       setAppLogs(logData || []);
 
       if (showNotification) {
-        toast.success('Datos actualizados desde Supabase');
+        toast.success('Datos sincronizados con la Base de Datos');
       }
     } catch (err: any) {
       console.error('Error al conectar con Supabase:', err);
@@ -103,63 +122,135 @@ export default function AdminPage() {
       setIsRefreshing(false);
       setIsLoadingInitial(false);
     }
-  }, []);
+  }, [currentUserEmail]);
 
+  // Auth Initialization: Check active session in Supabase or Local Storage
   useEffect(() => {
-    loadData();
+    const checkAuthStatus = async () => {
+      try {
+        // 1. Check local session storage
+        const stored = localStorage.getItem('residential_admin_session');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed?.email) {
+              setCurrentUserEmail(parsed.email);
+              setCurrentUserName(parsed.name || parsed.email);
+              setUserRole(normalizeRole(parsed.role));
+              setIsAuthenticated(true);
+            }
+          } catch {}
+        }
+
+        // 2. Check Supabase Auth active session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const email = session.user.email || '';
+          setCurrentUserEmail(email);
+          setIsAuthenticated(true);
+
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
+
+          if (prof) {
+            setCurrentUserProfile(prof);
+            setCurrentUserName(prof.full_name || email);
+            setUserRole(normalizeRole(prof.role));
+          } else {
+            const role = normalizeRole(session.user.user_metadata?.role || 'admin');
+            const name = session.user.user_metadata?.full_name || email;
+            setUserRole(role);
+            setCurrentUserName(name);
+          }
+        }
+      } catch (err) {
+        console.error('Error checking auth status:', err);
+      } finally {
+        setIsCheckingAuth(false);
+        loadData();
+      }
+    };
+
+    checkAuthStatus();
+
+    // Listen to Supabase Auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const email = session.user.email || '';
+        setCurrentUserEmail(email);
+        setIsAuthenticated(true);
+
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (prof) {
+          setCurrentUserProfile(prof);
+          setCurrentUserName(prof.full_name || email);
+          setUserRole(normalizeRole(prof.role));
+        } else {
+          const role = normalizeRole(session.user.user_metadata?.role || 'admin');
+          const name = session.user.user_metadata?.full_name || email;
+          setUserRole(role);
+          setCurrentUserName(name);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        localStorage.removeItem('residential_admin_session');
+        setIsAuthenticated(false);
+        setCurrentUserProfile(null);
+        setActiveTab('overview');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [loadData]);
 
-  // Authentication Handlers
-  const handleLoginAttempt = async (email: string, pass: string): Promise<{ success: boolean; message?: string }> => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: pass,
-      });
-
-      if (!error && data?.user) {
-        setCurrentUserEmail(data.user.email || email);
-        setIsAuthenticated(true);
-        toast.success(`Sesión iniciada como ${data.user.email || email}`);
-        return { success: true };
-      }
-    } catch {
-      console.log('Supabase Auth check');
+  // Ensure role tab restrictions
+  const handleSelectTab = (tab: AdminTab) => {
+    if ((tab === 'profiles' || tab === 'logs') && userRole !== 'admin') {
+      toast.warning('Esta sección requiere permisos de Administrador General');
+      setActiveTab('overview');
+      return;
     }
+    setActiveTab(tab);
+  };
 
-    const matchedProfile = profiles.find((p) => p.email?.toLowerCase() === email.toLowerCase());
-    if (matchedProfile) {
-      setCurrentUserEmail(email);
-      setCurrentUserProfile(matchedProfile);
-      setIsAuthenticated(true);
-      toast.success(`Sesión iniciada como ${matchedProfile.full_name || email}`);
-      return { success: true };
+  const handleLoginSuccess = (email: string, role: UserRole = 'admin', name?: string) => {
+    setCurrentUserEmail(email);
+    setUserRole(role);
+    if (name) {
+      setCurrentUserName(name);
     }
-
-    if (email === 'admin@residencial.com' || email.includes('@')) {
-      setCurrentUserEmail(email);
-      setIsAuthenticated(true);
-      toast.success(`Sesión iniciada como ${email}`);
-      return { success: true };
-    }
-
-    toast.error('Credenciales inválidas');
-    return {
-      success: false,
-      message: 'Credenciales inválidas. Ingresa tu correo de administrador.',
-    };
+    setIsAuthenticated(true);
+    setActiveTab('overview');
+    loadData();
   };
 
   const handleSignOut = async () => {
     try {
+      localStorage.removeItem('residential_admin_session');
       await supabase.auth.signOut();
-    } catch {}
+    } catch (err) {
+      console.warn('Sign out error:', err);
+    }
     setIsAuthenticated(false);
+    setCurrentUserProfile(null);
     toast.info('Sesión cerrada correctamente');
   };
 
   // Categories CRUD
   const handleSaveCategory = async (cat: Category) => {
+    if (permissions.isReadOnly) {
+      toast.error('No tienes permisos para modificar categorías');
+      return;
+    }
     try {
       const { error } = await supabase.from('categories').upsert(cat);
       if (error) {
@@ -174,6 +265,10 @@ export default function AdminPage() {
   };
 
   const handleDeleteCategory = async (id: string) => {
+    if (permissions.isReadOnly) {
+      toast.error('No tienes permisos para eliminar categorías');
+      return;
+    }
     const deletedCategory = categories.find((c) => c.id === id);
     try {
       const { error } = await supabase.from('categories').delete().eq('id', id);
@@ -190,6 +285,10 @@ export default function AdminPage() {
 
   // Businesses CRUD
   const handleSaveBusiness = async (biz: Business) => {
+    if (permissions.isReadOnly) {
+      toast.error('No tienes permisos para modificar comercios');
+      return;
+    }
     try {
       const { error } = await supabase.from('businesses').upsert(biz);
       if (error) {
@@ -203,7 +302,29 @@ export default function AdminPage() {
     }
   };
 
+  const handleBatchSaveBusinesses = async (batch: Business[]) => {
+    if (permissions.isReadOnly) {
+      toast.error('No tienes permisos para importar comercios');
+      return;
+    }
+    try {
+      const { error } = await supabase.from('businesses').upsert(batch);
+      if (error) {
+        toast.error(`Error al guardar lote en Supabase: ${error.message}`);
+        return;
+      }
+      toast.success(`${batch.length} comercios importados exitosamente`);
+      await loadData();
+    } catch (err: any) {
+      toast.error(`Error al importar lote: ${err?.message || 'Fallo de red'}`);
+    }
+  };
+
   const handleDeleteBusiness = async (id: string) => {
+    if (permissions.isReadOnly) {
+      toast.error('No tienes permisos para eliminar comercios');
+      return;
+    }
     const deletedBiz = businesses.find((b) => b.id === id);
     try {
       const { error } = await supabase.from('businesses').delete().eq('id', id);
@@ -220,13 +341,17 @@ export default function AdminPage() {
 
   // Menu Items CRUD
   const handleSaveMenuItem = async (item: MenuItem) => {
+    if (permissions.isReadOnly) {
+      toast.error('No tienes permisos para modificar productos');
+      return;
+    }
     try {
       const { error } = await supabase.from('menu_items').upsert(item);
       if (error) {
-        toast.error(`Error al guardar ítem en Supabase: ${error.message}`);
+        toast.error(`Error al guardar producto en Supabase: ${error.message}`);
         return;
       }
-      toast.success(`Ítem "${item.name}" guardado con éxito`);
+      toast.success(`Producto "${item.name}" guardado con éxito`);
       await loadData();
     } catch (err: any) {
       toast.error(`Error: ${err?.message || 'Fallo al guardar'}`);
@@ -234,14 +359,18 @@ export default function AdminPage() {
   };
 
   const handleDeleteMenuItem = async (id: string) => {
+    if (permissions.isReadOnly) {
+      toast.error('No tienes permisos para eliminar productos');
+      return;
+    }
     const deletedItem = menuItems.find((m) => m.id === id);
     try {
       const { error } = await supabase.from('menu_items').delete().eq('id', id);
       if (error) {
-        toast.error(`Error al eliminar ítem: ${error.message}`);
+        toast.error(`Error al eliminar producto: ${error.message}`);
         return;
       }
-      toast.success(`Ítem "${deletedItem?.name || id}" eliminado con éxito`);
+      toast.success(`Producto "${deletedItem?.name || id}" eliminado con éxito`);
       await loadData();
     } catch (err: any) {
       toast.error(`Error: ${err?.message || 'Fallo al eliminar'}`);
@@ -250,13 +379,17 @@ export default function AdminPage() {
 
   // Promotions CRUD
   const handleSavePromotion = async (promo: Promotion) => {
+    if (permissions.isReadOnly) {
+      toast.error('No tienes permisos para modificar promociones');
+      return;
+    }
     try {
       const { error } = await supabase.from('promotions').upsert(promo);
       if (error) {
-        toast.error(`Error al guardar promoción en Supabase: ${error.message}`);
+        toast.error(`Error al guardar aviso en Supabase: ${error.message}`);
         return;
       }
-      toast.success(`Promoción "${promo.title}" guardada con éxito`);
+      toast.success(`Aviso "${promo.title}" publicado con éxito`);
       await loadData();
     } catch (err: any) {
       toast.error(`Error: ${err?.message || 'Fallo al guardar'}`);
@@ -264,14 +397,18 @@ export default function AdminPage() {
   };
 
   const handleDeletePromotion = async (id: string) => {
+    if (permissions.isReadOnly) {
+      toast.error('No tienes permisos para eliminar promociones');
+      return;
+    }
     const deletedPromo = promotions.find((p) => p.id === id);
     try {
       const { error } = await supabase.from('promotions').delete().eq('id', id);
       if (error) {
-        toast.error(`Error al eliminar promoción: ${error.message}`);
+        toast.error(`Error al eliminar aviso: ${error.message}`);
         return;
       }
-      toast.success(`Promoción "${deletedPromo?.title || id}" eliminada con éxito`);
+      toast.success(`Aviso "${deletedPromo?.title || id}" eliminado con éxito`);
       await loadData();
     } catch (err: any) {
       toast.error(`Error: ${err?.message || 'Fallo al eliminar'}`);
@@ -280,13 +417,17 @@ export default function AdminPage() {
 
   // Profiles CRUD
   const handleSaveProfile = async (prof: Profile) => {
+    if (!permissions.canManageUsers) {
+      toast.error('Solo los Administradores Generales pueden gestionar usuarios');
+      return;
+    }
     try {
       const { error } = await supabase.from('profiles').upsert(prof);
       if (error) {
-        toast.error(`Error al guardar perfil en Supabase: ${error.message}`);
+        toast.error(`Error al guardar usuario en Supabase: ${error.message}`);
         return;
       }
-      toast.success(`Perfil de "${prof.full_name || prof.email || prof.id}" guardado con éxito`);
+      toast.success(`Usuario "${prof.full_name || prof.email}" guardado con éxito`);
       await loadData();
     } catch (err: any) {
       toast.error(`Error: ${err?.message || 'Fallo al guardar'}`);
@@ -294,43 +435,55 @@ export default function AdminPage() {
   };
 
   const handleDeleteProfile = async (id: string) => {
+    if (!permissions.canManageUsers) {
+      toast.error('Solo los Administradores Generales pueden eliminar usuarios');
+      return;
+    }
     const deletedProf = profiles.find((p) => p.id === id);
     try {
       const { error } = await supabase.from('profiles').delete().eq('id', id);
       if (error) {
-        toast.error(`Error al eliminar perfil: ${error.message}`);
+        toast.error(`Error al eliminar usuario: ${error.message}`);
         return;
       }
-      toast.success(`Perfil de "${deletedProf?.full_name || id}" eliminado con éxito`);
+      toast.success(`Usuario "${deletedProf?.full_name || id}" eliminado con éxito`);
       await loadData();
     } catch (err: any) {
       toast.error(`Error: ${err?.message || 'Fallo al eliminar'}`);
     }
   };
 
-  // Logs CRUD
-  const handleAddLog = async (log: AppLog) => {
+  // App Logs CRUD
+  const handleAddLog = async (logPayload: Omit<AppLog, 'id' | 'created_at'>) => {
     try {
-      const { error } = await supabase.from('app_logs').insert(log);
+      const newLog: AppLog = {
+        id: crypto.randomUUID(),
+        ...logPayload,
+        created_at: new Date().toISOString(),
+      };
+      const { error } = await supabase.from('app_logs').insert(newLog);
       if (error) {
-        toast.error(`Error al registrar log: ${error.message}`);
+        console.warn('Error al registrar log:', error.message);
         return;
       }
-      toast.success('Log de error registrado');
       await loadData();
-    } catch (err: any) {
-      toast.error(`Error: ${err?.message || 'Fallo al guardar log'}`);
+    } catch (err) {
+      console.warn('Fallo al registrar log local:', err);
     }
   };
 
   const handleDeleteLog = async (id: string) => {
+    if (!permissions.canViewLogs) {
+      toast.error('Solo los Administradores pueden gestionar el historial');
+      return;
+    }
     try {
       const { error } = await supabase.from('app_logs').delete().eq('id', id);
       if (error) {
         toast.error(`Error al eliminar log: ${error.message}`);
         return;
       }
-      toast.success('Log eliminado con éxito');
+      toast.success('Registro de log eliminado');
       await loadData();
     } catch (err: any) {
       toast.error(`Error: ${err?.message || 'Fallo al eliminar log'}`);
@@ -342,33 +495,39 @@ export default function AdminPage() {
     businesses: businesses.length,
     menuItems: menuItems.length,
     promotions: promotions.length,
+    events: events.length,
     profiles: profiles.length,
     logs: appLogs.length,
   };
 
-  // Render Login Screen when unauthenticated
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center space-y-4 text-slate-600 font-sans">
+        <Loader2 className="w-9 h-9 animate-spin text-blue-600" />
+        <p className="text-xs font-bold text-slate-500">Verificando sesión en la base de datos...</p>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <LoginScreen
-        onLoginSuccess={(email) => {
-          setCurrentUserEmail(email);
-          setIsAuthenticated(true);
-        }}
-        onLoginAttempt={handleLoginAttempt}
+        onLoginSuccess={handleLoginSuccess}
       />
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-900 font-sans">
-      {/* Sidebar (Responsive Desktop & Mobile Drawer) */}
+    <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
+      {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleSelectTab}
         counts={counts}
         currentUserEmail={currentUserEmail}
-        currentUserName={currentUserProfile?.full_name || 'Admin Residencial'}
+        currentUserName={currentUserName || currentUserProfile?.full_name || 'Usuario'}
         currentUserAvatar={currentUserProfile?.avatar_url || undefined}
+        userRole={userRole}
         isMobileOpen={isMobileSidebarOpen}
         onMobileClose={() => setIsMobileSidebarOpen(false)}
       />
@@ -378,13 +537,14 @@ export default function AdminPage() {
         {/* Sticky Header */}
         <Header
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={handleSelectTab}
           isOnline={isOnline}
           onRefresh={() => loadData(true)}
           isRefreshing={isRefreshing}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           onSignOut={handleSignOut}
+          userRole={userRole}
           onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
         />
 
@@ -405,7 +565,7 @@ export default function AdminPage() {
                   promotions={promotions}
                   profiles={profiles}
                   logs={appLogs}
-                  setActiveTab={setActiveTab}
+                  setActiveTab={handleSelectTab}
                   isOnline={isOnline}
                 />
               )}
@@ -416,6 +576,7 @@ export default function AdminPage() {
                   onSaveCategory={handleSaveCategory}
                   onDeleteCategory={handleDeleteCategory}
                   searchTerm={searchTerm}
+                  canEdit={!permissions.isReadOnly}
                 />
               )}
 
@@ -424,8 +585,10 @@ export default function AdminPage() {
                   businesses={businesses}
                   categories={categories}
                   onSaveBusiness={handleSaveBusiness}
+                  onBatchSaveBusinesses={handleBatchSaveBusinesses}
                   onDeleteBusiness={handleDeleteBusiness}
                   searchTerm={searchTerm}
+                  canEdit={!permissions.isReadOnly}
                 />
               )}
 
@@ -436,6 +599,7 @@ export default function AdminPage() {
                   onSaveMenuItem={handleSaveMenuItem}
                   onDeleteMenuItem={handleDeleteMenuItem}
                   searchTerm={searchTerm}
+                  canEdit={!permissions.isReadOnly}
                 />
               )}
 
@@ -447,10 +611,33 @@ export default function AdminPage() {
                   onSavePromotion={handleSavePromotion}
                   onDeletePromotion={handleDeletePromotion}
                   searchTerm={searchTerm}
+                  canEdit={!permissions.isReadOnly}
                 />
               )}
 
-              {activeTab === 'profiles' && (
+              {activeTab === 'events' && (
+                <EventsModule
+                  events={events}
+                  searchTerm={searchTerm}
+                  onRefresh={() => loadData()}
+                  canEdit={!permissions.isReadOnly}
+                />
+              )}
+
+              {activeTab === 'storage' && (
+                <StorageModule
+                  businesses={businesses}
+                  menuItems={menuItems}
+                  promotions={promotions}
+                  events={events}
+                  profiles={profiles}
+                  categories={categories}
+                  searchTerm={searchTerm}
+                  canEdit={!permissions.isReadOnly}
+                />
+              )}
+
+              {activeTab === 'profiles' && permissions.canManageUsers && (
                 <ProfilesModule
                   profiles={profiles}
                   onSaveProfile={handleSaveProfile}
@@ -459,7 +646,7 @@ export default function AdminPage() {
                 />
               )}
 
-              {activeTab === 'logs' && (
+              {activeTab === 'logs' && permissions.canViewLogs && (
                 <LogsModule
                   logs={appLogs}
                   onAddLog={handleAddLog}

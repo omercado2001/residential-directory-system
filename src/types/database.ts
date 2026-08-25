@@ -55,6 +55,19 @@ export interface Promotion {
   created_at?: string;
 }
 
+export interface CommunityEvent {
+  id: string;
+  title: string;
+  category?: string | null;
+  location?: string | null;
+  event_date?: string | null;
+  description?: string | null;
+  organizer_phone?: string | null;
+  whatsapp?: string | null;
+  image?: string | null;
+  created_at?: string;
+}
+
 export interface UserFavorite {
   user_id: string;
   business_id: string;
@@ -81,11 +94,24 @@ export interface AppLog {
   created_at?: string;
 }
 
+export interface SystemUser {
+  id: string;
+  username: string;
+  email: string;
+  password?: string;
+  full_name: string;
+  role: string;
+  avatar_url?: string | null;
+  created_at?: string;
+}
+
 export type TableName =
   | 'categories'
   | 'businesses'
   | 'menu_items'
   | 'promotions'
+  | 'events'
   | 'user_favorites'
   | 'profiles'
+  | 'system_users'
   | 'app_logs';

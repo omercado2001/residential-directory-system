@@ -5,6 +5,7 @@ import { Terminal, Bug, Trash2, Eye, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/ui/table-pagination';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { AppLog } from '@/types/database';
 
 interface LogsModuleProps {
@@ -19,6 +20,7 @@ const PLATFORMS = ['ALL', 'ios', 'android', 'web'];
 export default function LogsModule({ logs, onAddLog, onDeleteLog, searchTerm }: LogsModuleProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AppLog | null>(null);
+  const [confirmDeleteLog, setConfirmDeleteLog] = useState<AppLog | null>(null);
   const [platformFilter, setPlatformFilter] = useState<string>('ALL');
 
   // Pagination state
@@ -42,6 +44,12 @@ export default function LogsModule({ logs, onAddLog, onDeleteLog, searchTerm }: 
   const openLogDetail = (log: AppLog) => {
     setSelectedLog(log);
     setIsModalOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDeleteLog) return;
+    await onDeleteLog(confirmDeleteLog.id);
+    setConfirmDeleteLog(null);
   };
 
   const getSeverityChip = () => (
@@ -112,7 +120,7 @@ export default function LogsModule({ logs, onAddLog, onDeleteLog, searchTerm }: 
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex justify-end space-x-2">
                         <Button className="w-8 h-8 p-0 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200" variant="ghost" onClick={() => openLogDetail(log)}><Eye className="w-3.5 h-3.5" /></Button>
-                        <Button className="w-8 h-8 p-0 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100" variant="ghost" onClick={() => onDeleteLog(log.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        <Button className="w-8 h-8 p-0 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100" variant="ghost" onClick={() => setConfirmDeleteLog(log)}><Trash2 className="w-3.5 h-3.5" /></Button>
                       </div>
                     </td>
                   </tr>
@@ -161,6 +169,18 @@ export default function LogsModule({ logs, onAddLog, onDeleteLog, searchTerm }: 
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Confirmation Dialog for Delete */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmDeleteLog)}
+        onClose={() => setConfirmDeleteLog(null)}
+        onConfirm={executeDelete}
+        title="¿Eliminar Registro de Incidencia?"
+        description={`¿Estás seguro de que deseas eliminar este registro de alerta? Esta acción no se puede deshacer.`}
+        confirmText="Sí, Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </div>
   );
 }

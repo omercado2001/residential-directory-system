@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, RefreshCw, Bell, Download, Calendar, LogOut, Menu } from 'lucide-react';
+import { Search, RefreshCw, Bell, Download, Calendar, LogOut, Menu, Shield, Edit3, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AdminTab } from './Sidebar';
+import { UserRole } from '@/types/roles';
 
 interface HeaderProps {
   activeTab: AdminTab;
@@ -15,6 +16,7 @@ interface HeaderProps {
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   onSignOut: () => void;
+  userRole?: UserRole;
   onOpenMobileMenu?: () => void;
 }
 
@@ -27,6 +29,7 @@ export default function Header({
   searchTerm,
   setSearchTerm,
   onSignOut,
+  userRole = 'admin',
   onOpenMobileMenu,
 }: HeaderProps) {
   const [showSearchInput, setShowSearchInput] = useState(false);
@@ -37,6 +40,8 @@ export default function Header({
     { id: 'categories', label: 'Categorías' },
     { id: 'menu_items', label: 'Productos' },
     { id: 'promotions', label: 'Promociones' },
+    { id: 'events', label: 'Eventos' },
+    { id: 'storage', label: 'Archivos' },
   ];
 
   return (
@@ -57,9 +62,16 @@ export default function Header({
             </Button>
           )}
 
-          <h2 className="text-base sm:text-xl lg:text-2xl font-black tracking-tight text-slate-900 truncate">
-            Directorio Residencial
-          </h2>
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-base sm:text-xl lg:text-2xl font-black tracking-tight text-slate-900 truncate">
+              Directorio Residencial
+            </h2>
+            {userRole === 'viewer' && (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">
+                <Eye className="w-3.5 h-3.5" /> Modo Consulta
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Right Action Buttons */}

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/ui/table-pagination';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Category } from '@/types/database';
 
 interface CategoriesModuleProps {
@@ -19,6 +20,7 @@ interface CategoriesModuleProps {
   onSaveCategory: (category: Category) => Promise<void>;
   onDeleteCategory: (id: string) => Promise<void>;
   searchTerm: string;
+  canEdit?: boolean;
 }
 
 const COLOR_PRESETS = [
@@ -58,7 +60,13 @@ export function renderCategoryIcon(iconName?: string, className = 'w-4 h-4') {
   return <Tag className={className} />;
 }
 
-export default function CategoriesModule({ categories, onSaveCategory, onDeleteCategory, searchTerm }: CategoriesModuleProps) {
+export default function CategoriesModule({
+  categories,
+  onSaveCategory,
+  onDeleteCategory,
+  searchTerm,
+  canEdit = true,
+}: CategoriesModuleProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [id, setId] = useState('');
@@ -66,6 +74,10 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
   const [slug, setSlug] = useState('');
   const [color, setColor] = useState('#3b82f6');
   const [icon, setIcon] = useState('Utensils');
+
+  // Confirmation dialogs state
+  const [confirmDeleteCat, setConfirmDeleteCat] = useState<Category | null>(null);
+  const [confirmUpdatePayload, setConfirmUpdatePayload] = useState<Category | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -104,7 +116,7 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
     }
   };
 
-  const handleSubmit = async () => {
+  const handleFormSubmit = async () => {
     if (!name) return;
     const finalSlug = slug || name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const finalId = id || editingCategory?.id || finalSlug || `cat-${Date.now()}`;
@@ -116,8 +128,28 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
       icon,
       created_at: editingCategory?.created_at || new Date().toISOString(),
     };
-    await onSaveCategory(payload);
+
+    if (editingCategory) {
+      // Prompt confirmation before updating
+      setConfirmUpdatePayload(payload);
+    } else {
+      // Direct creation
+      await onSaveCategory(payload);
+      setIsOpen(false);
+    }
+  };
+
+  const executeUpdate = async () => {
+    if (!confirmUpdatePayload) return;
+    await onSaveCategory(confirmUpdatePayload);
+    setConfirmUpdatePayload(null);
     setIsOpen(false);
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDeleteCat) return;
+    await onDeleteCategory(confirmDeleteCat.id);
+    setConfirmDeleteCat(null);
   };
 
   return (
@@ -130,9 +162,15 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
           </h2>
           <p className="text-xs text-slate-500 mt-1">Categorías registradas ({categories.length})</p>
         </div>
-        <Button onClick={openCreateModal} className="font-bold shadow-md bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 h-10 flex items-center gap-2">
-          <Plus className="w-4 h-4" /><span>Nueva Categoría</span>
-        </Button>
+        {canEdit ? (
+          <Button onClick={openCreateModal} className="font-bold shadow-md bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 h-10 flex items-center gap-2">
+            <Plus className="w-4 h-4" /><span>Nueva Categoría</span>
+          </Button>
+        ) : (
+          <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">
+            Modo Solo Consulta
+          </span>
+        )}
       </div>
 
       {/* Styled Table */}
@@ -145,12 +183,12 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
                 <th className="py-3.5 px-4">CÓDIGO</th>
                 <th className="py-3.5 px-4">COLOR DISTINTIVO</th>
                 <th className="py-3.5 px-4">ÍCONO VISUAL</th>
-                <th className="py-3.5 px-4 text-right">ACCIONES</th>
+                {canEdit && <th className="py-3.5 px-4 text-right">ACCIONES</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {paginatedCategories.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-8 text-slate-500 text-xs">No hay categorías registradas.</td></tr>
+                <tr><td colSpan={canEdit ? 5 : 4} className="text-center py-8 text-slate-500 text-xs">No hay categorías registradas.</td></tr>
               ) : (
                 paginatedCategories.map((cat) => (
                   <tr key={cat.id} className="hover:bg-slate-50/50 transition-colors">
@@ -180,16 +218,18 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
                         <span className="font-semibold text-slate-700">{cat.icon}</span>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex justify-end space-x-2">
-                        <Button className="w-8 h-8 p-0 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200" variant="ghost" onClick={() => openEditModal(cat)}>
-                          <Edit className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button className="w-8 h-8 p-0 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100" variant="ghost" onClick={() => onDeleteCategory(cat.id)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </td>
+                    {canEdit && (
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex justify-end space-x-2">
+                          <Button className="w-8 h-8 p-0 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200" variant="ghost" onClick={() => openEditModal(cat)}>
+                            <Edit className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button className="w-8 h-8 p-0 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100" variant="ghost" onClick={() => setConfirmDeleteCat(cat)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -284,10 +324,36 @@ export default function CategoriesModule({ categories, onSaveCategory, onDeleteC
           </div>
           <DialogFooter>
             <Button onClick={() => setIsOpen(false)} variant="secondary" className="rounded-full font-semibold text-xs">Cancelar</Button>
-            <Button onClick={handleSubmit} className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs">Guardar Categoría</Button>
+            <Button onClick={handleFormSubmit} className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs">
+              {editingCategory ? 'Actualizar Categoría' : 'Guardar Categoría'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog for Delete */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmDeleteCat)}
+        onClose={() => setConfirmDeleteCat(null)}
+        onConfirm={executeDelete}
+        title="¿Eliminar Categoría?"
+        description={`¿Estás seguro de que deseas eliminar la categoría "${confirmDeleteCat?.name}"? Esta acción no se puede deshacer.`}
+        confirmText="Sí, Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
+
+      {/* Confirmation Dialog for Update */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmUpdatePayload)}
+        onClose={() => setConfirmUpdatePayload(null)}
+        onConfirm={executeUpdate}
+        title="¿Actualizar Categoría?"
+        description={`¿Deseas guardar los cambios realizados en la categoría "${confirmUpdatePayload?.name}"?`}
+        confirmText="Sí, Actualizar"
+        cancelText="Cancelar"
+        variant="primary"
+      />
     </div>
   );
 }

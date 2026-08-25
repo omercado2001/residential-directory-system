@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { ImageDropzone } from '@/components/ui/image-dropzone';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Profile } from '@/types/database';
 
 interface ProfilesModuleProps {
@@ -17,22 +18,29 @@ interface ProfilesModuleProps {
 }
 
 const ROLES = [
-  { id: 'admin', name: 'Administrador' },
-  { id: 'business_owner', name: 'Dueño de Negocio' },
-  { id: 'resident', name: 'Residente / Usuario' },
+  { id: 'admin', name: 'Administrador (Acceso Total a Todo el Sistema)' },
+  { id: 'editor', name: 'Editor / Gestor (Control Total de 4 Secciones)' },
+  { id: 'viewer', name: 'Lector (Solo Consulta de 4 Secciones)' },
 ];
 
 const getRoleChip = (role?: string) => {
-  switch (role) {
-    case 'admin': return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-extrabold border border-purple-200"><Shield className="w-3 h-3" />Administrador</span>;
-    case 'business_owner': return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-extrabold border border-blue-200"><Store className="w-3 h-3" />Negocio</span>;
-    default: return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-extrabold border border-slate-200"><UserIcon className="w-3 h-3" />Residente</span>;
+  const clean = (role || '').toLowerCase();
+  if (clean === 'admin' || clean === 'super_admin' || clean === 'administrador') {
+    return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-extrabold border border-purple-200"><Shield className="w-3 h-3" />Admin Total</span>;
   }
+  if (clean === 'editor' || clean === 'business_owner' || clean === 'gestor') {
+    return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-extrabold border border-blue-200"><Store className="w-3 h-3" />Editor Gestor</span>;
+  }
+  return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-extrabold border border-slate-200"><UserIcon className="w-3 h-3" />Solo Lectura</span>;
 };
 
 export default function ProfilesModule({ profiles, onSaveProfile, onDeleteProfile, searchTerm }: ProfilesModuleProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+
+  // Confirmation state
+  const [confirmDeleteProfile, setConfirmDeleteProfile] = useState<Profile | null>(null);
+  const [confirmUpdatePayload, setConfirmUpdatePayload] = useState<Profile | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -67,14 +75,32 @@ export default function ProfilesModule({ profiles, onSaveProfile, onDeleteProfil
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async () => {
+  const handleFormSubmit = async () => {
     const finalId = id || editingProfile?.id || crypto.randomUUID();
     const payload: Profile = {
       id: finalId, full_name: fullName, email, role, avatar_url: avatarUrl,
       created_at: editingProfile?.created_at || new Date().toISOString(),
     };
-    await onSaveProfile(payload);
+
+    if (editingProfile) {
+      setConfirmUpdatePayload(payload);
+    } else {
+      await onSaveProfile(payload);
+      setIsModalOpen(false);
+    }
+  };
+
+  const executeUpdate = async () => {
+    if (!confirmUpdatePayload) return;
+    await onSaveProfile(confirmUpdatePayload);
+    setConfirmUpdatePayload(null);
     setIsModalOpen(false);
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDeleteProfile) return;
+    await onDeleteProfile(confirmDeleteProfile.id);
+    setConfirmDeleteProfile(null);
   };
 
   return (
@@ -135,7 +161,7 @@ export default function ProfilesModule({ profiles, onSaveProfile, onDeleteProfil
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex justify-end space-x-2">
                         <Button className="w-8 h-8 p-0 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200" variant="ghost" onClick={() => openEditModal(p)}><Edit className="w-3.5 h-3.5" /></Button>
-                        <Button className="w-8 h-8 p-0 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100" variant="ghost" onClick={() => onDeleteProfile(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        <Button className="w-8 h-8 p-0 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100" variant="ghost" onClick={() => setConfirmDeleteProfile(p)}><Trash2 className="w-3.5 h-3.5" /></Button>
                       </div>
                     </td>
                   </tr>
@@ -186,10 +212,36 @@ export default function ProfilesModule({ profiles, onSaveProfile, onDeleteProfil
           </div>
           <DialogFooter>
             <Button onClick={() => setIsModalOpen(false)} variant="secondary" className="rounded-full font-semibold text-xs">Cancelar</Button>
-            <Button onClick={handleSubmit} className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs">Guardar Usuario</Button>
+            <Button onClick={handleFormSubmit} className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs">
+              {editingProfile ? 'Actualizar Usuario' : 'Guardar Usuario'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog for Delete */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmDeleteProfile)}
+        onClose={() => setConfirmDeleteProfile(null)}
+        onConfirm={executeDelete}
+        title="¿Eliminar Usuario?"
+        description={`¿Estás seguro de que deseas eliminar el usuario "${confirmDeleteProfile?.full_name || confirmDeleteProfile?.email}"? Esta acción no se puede deshacer.`}
+        confirmText="Sí, Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
+
+      {/* Confirmation Dialog for Update */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmUpdatePayload)}
+        onClose={() => setConfirmUpdatePayload(null)}
+        onConfirm={executeUpdate}
+        title="¿Actualizar Usuario?"
+        description={`¿Deseas guardar los cambios realizados en el usuario "${confirmUpdatePayload?.full_name || confirmUpdatePayload?.email}"?`}
+        confirmText="Sí, Actualizar"
+        cancelText="Cancelar"
+        variant="primary"
+      />
     </div>
   );
 }

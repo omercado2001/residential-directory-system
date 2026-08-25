@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { ImageDropzone } from '@/components/ui/image-dropzone';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MenuItem, Business } from '@/types/database';
 
 interface MenuItemsModuleProps {
@@ -16,14 +17,24 @@ interface MenuItemsModuleProps {
   onSaveMenuItem: (item: MenuItem) => Promise<void>;
   onDeleteMenuItem: (id: string) => Promise<void>;
   searchTerm: string;
+  canEdit?: boolean;
 }
 
-const DEFAULT_MENU_IMAGE = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=200&q=80';
-
-export default function MenuItemsModule({ menuItems, businesses, onSaveMenuItem, onDeleteMenuItem, searchTerm }: MenuItemsModuleProps) {
+export default function MenuItemsModule({
+  menuItems,
+  businesses,
+  onSaveMenuItem,
+  onDeleteMenuItem,
+  searchTerm,
+  canEdit = true,
+}: MenuItemsModuleProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [selectedBusinessFilter, setSelectedBusinessFilter] = useState<string>('ALL');
+
+  // Confirmation state
+  const [confirmDeleteItem, setConfirmDeleteItem] = useState<MenuItem | null>(null);
+  const [confirmUpdatePayload, setConfirmUpdatePayload] = useState<MenuItem | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,15 +75,33 @@ export default function MenuItemsModule({ menuItems, businesses, onSaveMenuItem,
     setIsModalOpen(true);
   };
 
-  const handleSubmit = async () => {
+  const handleFormSubmit = async () => {
     if (!name || !businessId) return;
     const payload: MenuItem = {
       id: editingItem?.id || crypto.randomUUID(),
       business_id: businessId, name, category, price: Number(price), description, image,
       created_at: editingItem?.created_at || new Date().toISOString(),
     };
-    await onSaveMenuItem(payload);
+
+    if (editingItem) {
+      setConfirmUpdatePayload(payload);
+    } else {
+      await onSaveMenuItem(payload);
+      setIsModalOpen(false);
+    }
+  };
+
+  const executeUpdate = async () => {
+    if (!confirmUpdatePayload) return;
+    await onSaveMenuItem(confirmUpdatePayload);
+    setConfirmUpdatePayload(null);
     setIsModalOpen(false);
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDeleteItem) return;
+    await onDeleteMenuItem(confirmDeleteItem.id);
+    setConfirmDeleteItem(null);
   };
 
   return (
@@ -100,9 +129,15 @@ export default function MenuItemsModule({ menuItems, businesses, onSaveMenuItem,
               {businesses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </div>
-          <Button onClick={openCreateModal} className="font-bold shadow-md bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 h-9 flex items-center gap-2">
-            <Plus className="w-4 h-4" /><span>Nuevo Producto</span>
-          </Button>
+          {canEdit ? (
+            <Button onClick={openCreateModal} className="font-bold shadow-md bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 h-9 flex items-center gap-2">
+              <Plus className="w-4 h-4" /><span>Nuevo Producto</span>
+            </Button>
+          ) : (
+            <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">
+              Modo Solo Consulta
+            </span>
+          )}
         </div>
       </div>
 
@@ -117,12 +152,12 @@ export default function MenuItemsModule({ menuItems, businesses, onSaveMenuItem,
                 <th className="py-3.5 px-4">NEGOCIO</th>
                 <th className="py-3.5 px-4">SECCIÓN DEL MENÚ</th>
                 <th className="py-3.5 px-4">PRECIO</th>
-                <th className="py-3.5 px-4 text-right">ACCIONES</th>
+                {canEdit && <th className="py-3.5 px-4 text-right">ACCIONES</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {paginatedItems.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-8 text-slate-500 text-xs">No hay productos registrados.</td></tr>
+                <tr><td colSpan={canEdit ? 6 : 5} className="text-center py-8 text-slate-500 text-xs">No hay productos registrados.</td></tr>
               ) : (
                 paginatedItems.map((item) => {
                   const b = businesses.find((biz) => biz.id === item.business_id);
@@ -130,9 +165,11 @@ export default function MenuItemsModule({ menuItems, businesses, onSaveMenuItem,
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="py-3.5 px-4">
                         <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden border border-slate-200 flex items-center justify-center">
-                          <img src={item.image || DEFAULT_MENU_IMAGE} alt={item.name}
-                            onError={(e) => { e.currentTarget.src = DEFAULT_MENU_IMAGE; }}
-                            className="w-full h-full object-cover" />
+                          {item.image ? (
+                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <UtensilsCrossed className="w-5 h-5 text-slate-400" />
+                          )}
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
@@ -144,12 +181,14 @@ export default function MenuItemsModule({ menuItems, businesses, onSaveMenuItem,
                         <span className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200">{item.category}</span>
                       </td>
                       <td className="py-3.5 px-4 font-mono font-bold text-emerald-600">${Number(item.price).toFixed(2)}</td>
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button className="w-8 h-8 p-0 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200" variant="ghost" onClick={() => openEditModal(item)}><Edit className="w-3.5 h-3.5" /></Button>
-                          <Button className="w-8 h-8 p-0 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100" variant="ghost" onClick={() => onDeleteMenuItem(item.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                        </div>
-                      </td>
+                      {canEdit && (
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex justify-end space-x-2">
+                            <Button className="w-8 h-8 p-0 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200" variant="ghost" onClick={() => openEditModal(item)}><Edit className="w-3.5 h-3.5" /></Button>
+                            <Button className="w-8 h-8 p-0 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100" variant="ghost" onClick={() => setConfirmDeleteItem(item)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
@@ -200,7 +239,9 @@ export default function MenuItemsModule({ menuItems, businesses, onSaveMenuItem,
               label="Foto del Producto"
               value={image}
               onChange={setImage}
-              folder="menu"
+              folder="products"
+              businessId={businessId}
+              businessName={businesses.find((b) => b.id === businessId)?.name || 'Comercio'}
             />
             <div className="space-y-1.5">
               <label className="text-slate-700 text-xs font-semibold block">Descripción o Ingredientes</label>
@@ -209,10 +250,36 @@ export default function MenuItemsModule({ menuItems, businesses, onSaveMenuItem,
           </div>
           <DialogFooter>
             <Button onClick={() => setIsModalOpen(false)} variant="secondary" className="rounded-full font-semibold text-xs">Cancelar</Button>
-            <Button onClick={handleSubmit} className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs">Guardar Producto</Button>
+            <Button onClick={handleFormSubmit} className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs">
+              {editingItem ? 'Actualizar Producto' : 'Guardar Producto'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog for Delete */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmDeleteItem)}
+        onClose={() => setConfirmDeleteItem(null)}
+        onConfirm={executeDelete}
+        title="¿Eliminar Producto?"
+        description={`¿Estás seguro de que deseas eliminar el producto "${confirmDeleteItem?.name}"? Esta acción no se puede deshacer.`}
+        confirmText="Sí, Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
+
+      {/* Confirmation Dialog for Update */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmUpdatePayload)}
+        onClose={() => setConfirmUpdatePayload(null)}
+        onConfirm={executeUpdate}
+        title="¿Actualizar Producto?"
+        description={`¿Deseas guardar los cambios realizados en el producto "${confirmUpdatePayload?.name}"?`}
+        confirmText="Sí, Actualizar"
+        cancelText="Cancelar"
+        variant="primary"
+      />
     </div>
   );
 }
