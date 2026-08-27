@@ -78,3 +78,9 @@ export function getRoleLabel(role: UserRole): string {
       return 'Solo Lectura';
   }
 }
+
+export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
+  admin: getRolePermissions('admin'),
+  editor: getRolePermissions('editor'),
+  viewer: getRolePermissions('viewer'),
+};

@@ -1,16 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Building2, Lock, User, ArrowRight, KeyRound, AlertCircle, Loader2 } from 'lucide-react';
+import { Building2, Lock, User, ArrowRight, KeyRound, AlertCircle, Loader2, ShieldCheck, Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
 import { UserRole, normalizeRole } from '@/types/roles';
+import { signJwt, storeAuthToken, TOKEN_DURATION_SECONDS } from '@/lib/jwt';
 import { toast } from 'sonner';
 
 interface LoginScreenProps {
-  onLoginSuccess: (userEmail: string, role?: UserRole, name?: string) => void;
+  onLoginSuccess: (userEmail: string, role?: UserRole, name?: string, token?: string) => void;
 }
 
 export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
@@ -46,17 +47,29 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           const role = normalizeRole(sysUser.role);
           const name = sysUser.full_name || sysUser.username;
           const email = sysUser.email || input;
+          const userId = sysUser.id;
 
-          // Save session locally
-          localStorage.setItem('residential_admin_session', JSON.stringify({
-            userId: sysUser.id,
+          // Generate Signed JWT with 4 hours expiration
+          const token = await signJwt({
+            sub: userId,
             email,
             name,
             role,
+          }, TOKEN_DURATION_SECONDS);
+
+          storeAuthToken(token);
+
+          // Save session locally
+          localStorage.setItem('residential_admin_session', JSON.stringify({
+            userId,
+            email,
+            name,
+            role,
+            jwt: token,
           }));
 
-          toast.success(`Bienvenido de vuelta, ${name}`);
-          onLoginSuccess(email, role, name);
+          toast.success(`Bienvenido de vuelta, ${name} (Sesión JWT activa por 4 horas)`);
+          onLoginSuccess(email, role, name, token);
           return;
         }
       } catch {
@@ -83,16 +96,28 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         const name =
           profile?.full_name || authData.user.user_metadata?.full_name || input;
         const email = authData.user.email || input;
+        const userId = authData.user.id;
 
-        localStorage.setItem('residential_admin_session', JSON.stringify({
-          userId: authData.user.id,
+        // Generate Signed JWT with 4 hours expiration
+        const token = await signJwt({
+          sub: userId,
           email,
           name,
           role,
+        }, TOKEN_DURATION_SECONDS);
+
+        storeAuthToken(token);
+
+        localStorage.setItem('residential_admin_session', JSON.stringify({
+          userId,
+          email,
+          name,
+          role,
+          jwt: token,
         }));
 
-        toast.success(`Bienvenido, ${name}`);
-        onLoginSuccess(email, role, name);
+        toast.success(`Bienvenido, ${name} (Sesión JWT activa por 4 horas)`);
+        onLoginSuccess(email, role, name, token);
         return;
       }
 
@@ -106,16 +131,28 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       if (profileMatch && (pass === 'admin123' || pass === 'Admin123!' || pass === 'Editor123!' || pass === 'Lector123!')) {
         const role = normalizeRole(profileMatch.role);
         const name = profileMatch.full_name || input;
+        const userId = profileMatch.id;
 
-        localStorage.setItem('residential_admin_session', JSON.stringify({
-          userId: profileMatch.id,
+        // Generate Signed JWT with 4 hours expiration
+        const token = await signJwt({
+          sub: userId,
           email: input,
           name,
           role,
+        }, TOKEN_DURATION_SECONDS);
+
+        storeAuthToken(token);
+
+        localStorage.setItem('residential_admin_session', JSON.stringify({
+          userId,
+          email: input,
+          name,
+          role,
+          jwt: token,
         }));
 
-        toast.success(`Bienvenido, ${name}`);
-        onLoginSuccess(input, role, name);
+        toast.success(`Bienvenido, ${name} (Sesión JWT activa por 4 horas)`);
+        onLoginSuccess(input, role, name, token);
         return;
       }
 
@@ -142,7 +179,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <Building2 className="w-8 h-8 text-blue-600" />
           </div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Directorio Residencial</h1>
-          <p className="text-xs text-slate-500 font-medium">Autenticación y Control de Acceso</p>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[11px] font-bold text-blue-700">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Autenticación Segura JWT (4 Horas)</span>
+          </div>
         </div>
 
         {/* Login Card */}
@@ -205,7 +245,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Verificando en la Base de Datos...</span>
+                    <span>Verificando y Generando JWT...</span>
                   </>
                 ) : (
                   <>
@@ -215,12 +255,17 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 )}
               </Button>
             </form>
+
+            <div className="pt-2 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+              <Clock className="w-3 h-3 text-slate-400" />
+              <span>Token con vigencia de 4 horas para peticiones seguras</span>
+            </div>
           </CardContent>
         </Card>
 
         {/* Footer info */}
         <div className="text-center text-[11px] text-slate-500">
-          Directorio Residencial &copy; {new Date().getFullYear()} — Verificación en Tiempo Real
+          Directorio Residencial &copy; {new Date().getFullYear()} — Autenticación JWT
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Building2, Plus, Edit, Trash2, Star, MapPin, Phone, Filter, FileSpreadsheet, Store, ImageOff } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, Star, MapPin, Phone, Filter, FileSpreadsheet, Store, ImageOff, Search, X } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { BusinessBulkImportDrawer } from './BusinessBulkImportDrawer';
 import { renderCategoryIcon } from './CategoriesModule';
 import { Business, Category } from '@/types/database';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 interface BusinessesModuleProps {
@@ -34,6 +35,7 @@ export default function BusinessesModule({
   searchTerm,
   canEdit = true,
 }: BusinessesModuleProps) {
+  const [localSearchTerm, setLocalSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBulkDrawerOpen, setIsBulkDrawerOpen] = useState(false);
   const [editingBusiness, setEditingBusiness] = useState<Business | null>(null);
@@ -64,12 +66,20 @@ export default function BusinessesModule({
   const [logo, setLogo] = useState('');
   const [gallery, setGallery] = useState('');
   const [featured, setFeatured] = useState(false);
+  const [lat, setLat] = useState<number | ''>(12.1364);
+  const [lng, setLng] = useState<number | ''>(-86.2514);
 
   const filteredBusinesses = businesses.filter((b) => {
+    const query = (localSearchTerm || searchTerm || '').toLowerCase().trim();
     const matchesSearch =
-      b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (b.address && b.address.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (b.tags && b.tags.toLowerCase().includes(searchTerm.toLowerCase()));
+      !query ||
+      b.name.toLowerCase().includes(query) ||
+      (b.description && b.description.toLowerCase().includes(query)) ||
+      (b.address && b.address.toLowerCase().includes(query)) ||
+      (b.tags && b.tags.toLowerCase().includes(query)) ||
+      (b.phone && b.phone.toLowerCase().includes(query)) ||
+      (b.whatsapp && b.whatsapp.toLowerCase().includes(query));
+
     const matchesCategory = selectedCategoryFilter === 'ALL' || b.category_id === selectedCategoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -87,6 +97,7 @@ export default function BusinessesModule({
     setRating(5.0); setReviews(0); setDistance(0.5); setHours('Lunes a Sábado de 08:00am a 05:30pm');
     setIsOpenState(true); setPhone(''); setWhatsapp('');
     setAddress(''); setDescription(''); setImage(''); setLogo(''); setGallery(''); setFeatured(false);
+    setLat(12.1364); setLng(-86.2514);
     setIsModalOpen(true);
   };
 
@@ -98,6 +109,7 @@ export default function BusinessesModule({
     setWhatsapp(b.whatsapp || ''); setAddress(b.address || ''); setDescription(b.description || '');
     setImage(b.image || ''); setLogo(b.logo || '');
     setGallery(b.gallery ? b.gallery.join(', ') : ''); setFeatured(b.featured ?? false);
+    setLat(b.lat ?? 12.1364); setLng(b.lng ?? -86.2514);
     setIsModalOpen(true);
   };
 
@@ -138,14 +150,19 @@ export default function BusinessesModule({
       logo,
       gallery: galleryArray,
       featured,
-      lat: 19.4326,
-      lng: -99.1332,
+      lat: lat !== '' && !isNaN(Number(lat)) ? Number(lat) : 12.1364,
+      lng: lng !== '' && !isNaN(Number(lng)) ? Number(lng) : -86.2514,
       created_at: editingBusiness?.created_at || new Date().toISOString(),
     };
 
     if (editingBusiness) {
       setConfirmUpdatePayload(payload);
     } else {
+      try {
+        await supabase.storage
+          .from('residential-directory')
+          .upload(`businesses/${payload.id}/.emptyFolderPlaceholder`, new Blob(['']), { upsert: true });
+      } catch {}
       await onSaveBusiness(payload);
       setIsModalOpen(false);
     }
@@ -165,6 +182,16 @@ export default function BusinessesModule({
   };
 
   const handleBatchImport = async (batch: Business[]) => {
+    try {
+      await Promise.allSettled(
+        batch.map((b) =>
+          supabase.storage
+            .from('residential-directory')
+            .upload(`businesses/${b.id}/.emptyFolderPlaceholder`, new Blob(['']), { upsert: true })
+        )
+      );
+    } catch {}
+
     if (onBatchSaveBusinesses) {
       await onBatchSaveBusinesses(batch);
     } else {
@@ -185,6 +212,30 @@ export default function BusinessesModule({
           <p className="text-xs text-slate-500 mt-1">Negocios registrados ({businesses.length})</p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Live Search Input directly on screen */}
+          <div className="relative">
+            <Input
+              placeholder="Buscar por nombre, palabras clave, dirección..."
+              value={localSearchTerm}
+              onChange={(e) => {
+                setLocalSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-9 text-xs w-60 sm:w-72 pl-9 pr-7 rounded-xl bg-slate-50 border-slate-200 focus:bg-white transition"
+            />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            {localSearchTerm && (
+              <button
+                type="button"
+                onClick={() => setLocalSearchTerm('')}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                title="Limpiar búsqueda"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
           <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3 h-9 rounded-xl">
             <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
             <select
@@ -387,21 +438,50 @@ export default function BusinessesModule({
               <Input placeholder="Ej. Sector 2, Frente al Parque Principal" value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="space-y-1.5">
+                <label className="text-slate-700 text-xs font-semibold flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Latitud (GPS)</span>
+                </label>
+                <Input
+                  placeholder="12.1364"
+                  type="number"
+                  step="any"
+                  value={lat === '' ? '' : String(lat)}
+                  onChange={(e) => setLat(e.target.value === '' ? '' : Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-slate-700 text-xs font-semibold flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Longitud (GPS)</span>
+                </label>
+                <Input
+                  placeholder="-86.2514"
+                  type="number"
+                  step="any"
+                  value={lng === '' ? '' : String(lng)}
+                  onChange={(e) => setLng(e.target.value === '' ? '' : Number(e.target.value))}
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ImageDropzone
                 label="Foto Principal del Comercio"
                 value={image}
                 onChange={setImage}
                 folder="businesses"
-                businessId={editingBusiness?.id || 'new'}
+                businessId={editingBusiness?.id || id}
                 businessName={name || 'Comercio'}
               />
               <ImageDropzone
                 label="Logo del Comercio"
                 value={logo}
                 onChange={setLogo}
-                folder="logos"
-                businessId={editingBusiness?.id || 'new'}
+                folder="businesses"
+                businessId={editingBusiness?.id || id}
                 businessName={name || 'Comercio'}
               />
             </div>

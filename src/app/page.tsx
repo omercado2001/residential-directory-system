@@ -25,8 +25,19 @@ import {
   CommunityEvent,
   Profile,
   AppLog,
+  AppAnalyticsEvent,
 } from '@/types/database';
 import { UserRole, normalizeRole, getRolePermissions } from '@/types/roles';
+import { fetchMobileAnalytics } from '@/lib/analytics';
+import {
+  verifyJwt,
+  getStoredAuthToken,
+  clearAuthToken,
+  isTokenExpired,
+  storeAuthToken,
+  signJwt,
+  TOKEN_DURATION_SECONDS,
+} from '@/lib/jwt';
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -53,6 +64,7 @@ export default function AdminPage() {
   const [events, setEvents] = useState<CommunityEvent[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [appLogs, setAppLogs] = useState<AppLog[]>([]);
+  const [appAnalytics, setAppAnalytics] = useState<AppAnalyticsEvent[]>([]);
 
   // Fetch Data from Supabase
   const loadData = useCallback(async (showNotification = false) => {
@@ -70,6 +82,7 @@ export default function AdminPage() {
         { data: eventsData, error: eventsError },
         { data: profData, error: profError },
         { data: logData, error: logError },
+        analyticsEvents,
       ] = await Promise.all([
         supabase.from('categories').select('*').order('name', { ascending: true }),
         supabase.from('businesses').select('*').order('name', { ascending: true }),
@@ -78,6 +91,7 @@ export default function AdminPage() {
         supabase.from('events').select('*').order('created_at', { ascending: false }),
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('app_logs').select('*').order('created_at', { ascending: false }),
+        fetchMobileAnalytics(),
       ]);
 
       if (catError) console.warn('categories fetch:', catError.message);
@@ -93,6 +107,7 @@ export default function AdminPage() {
       setMenuItems(menuData || []);
       setPromotions(promoData || []);
       setEvents(eventsData || []);
+      setAppAnalytics(analyticsEvents || []);
       if (profData && profData.length > 0) {
         setProfiles(profData);
         if (currentUserEmail) {
@@ -124,53 +139,79 @@ export default function AdminPage() {
     }
   }, [currentUserEmail]);
 
-  // Auth Initialization: Check active session in Supabase or Local Storage
+  // Auth Initialization: Verify 4-hour JWT token and active session
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        // 1. Check local session storage
+        // 1. Check and verify active JWT token
+        const jwtToken = getStoredAuthToken();
+        if (jwtToken) {
+          const payload = await verifyJwt(jwtToken);
+          if (payload) {
+            setCurrentUserEmail(payload.email);
+            setCurrentUserName(payload.name || payload.email);
+            setUserRole(normalizeRole(payload.role));
+            setIsAuthenticated(true);
+            loadData();
+            setIsCheckingAuth(false);
+            return;
+          } else {
+            clearAuthToken();
+            toast.error('Tu sesión JWT ha expirado. Por favor inicia sesión nuevamente.');
+          }
+        }
+
+        // 2. Check stored session object fallback
         const stored = localStorage.getItem('residential_admin_session');
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
             if (parsed?.email) {
+              // Sign fresh JWT if valid
+              const freshToken = await signJwt({
+                sub: parsed.userId || 'admin',
+                email: parsed.email,
+                name: parsed.name || parsed.email,
+                role: parsed.role || 'viewer',
+              }, TOKEN_DURATION_SECONDS);
+
+              storeAuthToken(freshToken);
               setCurrentUserEmail(parsed.email);
               setCurrentUserName(parsed.name || parsed.email);
               setUserRole(normalizeRole(parsed.role));
               setIsAuthenticated(true);
+              loadData();
+              setIsCheckingAuth(false);
+              return;
             }
           } catch {}
         }
 
-        // 2. Check Supabase Auth active session
+        // 3. Check Supabase Auth active session
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           const email = session.user.email || '';
+          const role = normalizeRole(session.user.user_metadata?.role || 'admin');
+          const name = session.user.user_metadata?.full_name || email;
+
+          const freshToken = await signJwt({
+            sub: session.user.id,
+            email,
+            name,
+            role,
+          }, TOKEN_DURATION_SECONDS);
+
+          storeAuthToken(freshToken);
           setCurrentUserEmail(email);
+          setCurrentUserName(name);
+          setUserRole(role);
           setIsAuthenticated(true);
-
-          const { data: prof } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .maybeSingle();
-
-          if (prof) {
-            setCurrentUserProfile(prof);
-            setCurrentUserName(prof.full_name || email);
-            setUserRole(normalizeRole(prof.role));
-          } else {
-            const role = normalizeRole(session.user.user_metadata?.role || 'admin');
-            const name = session.user.user_metadata?.full_name || email;
-            setUserRole(role);
-            setCurrentUserName(name);
-          }
+          loadData();
         }
       } catch (err) {
         console.error('Error checking auth status:', err);
       } finally {
         setIsCheckingAuth(false);
-        loadData();
       }
     };
 
@@ -180,27 +221,23 @@ export default function AdminPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
         const email = session.user.email || '';
+        const role = normalizeRole(session.user.user_metadata?.role || 'admin');
+        const name = session.user.user_metadata?.full_name || email;
+
+        const freshToken = await signJwt({
+          sub: session.user.id,
+          email,
+          name,
+          role,
+        }, TOKEN_DURATION_SECONDS);
+
+        storeAuthToken(freshToken);
         setCurrentUserEmail(email);
+        setCurrentUserName(name);
+        setUserRole(role);
         setIsAuthenticated(true);
-
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        if (prof) {
-          setCurrentUserProfile(prof);
-          setCurrentUserName(prof.full_name || email);
-          setUserRole(normalizeRole(prof.role));
-        } else {
-          const role = normalizeRole(session.user.user_metadata?.role || 'admin');
-          const name = session.user.user_metadata?.full_name || email;
-          setUserRole(role);
-          setCurrentUserName(name);
-        }
       } else if (event === 'SIGNED_OUT') {
-        localStorage.removeItem('residential_admin_session');
+        clearAuthToken();
         setIsAuthenticated(false);
         setCurrentUserProfile(null);
         setActiveTab('overview');
@@ -212,6 +249,53 @@ export default function AdminPage() {
     };
   }, [loadData]);
 
+  // Realtime & Periodic sync for live app_analytics (updates every 5 seconds)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const refreshAnalytics = async () => {
+      try {
+        const fresh = await fetchMobileAnalytics();
+        setAppAnalytics(fresh || []);
+      } catch {}
+    };
+
+    const interval = setInterval(refreshAnalytics, 5000);
+
+    const channel = supabase
+      .channel('realtime_app_analytics')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_analytics' },
+        () => {
+          refreshAnalytics();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated]);
+
+  // Periodic 4-hour JWT token expiration monitor (checks every 15 seconds)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const interval = setInterval(() => {
+      const token = getStoredAuthToken();
+      if (!token || isTokenExpired(token)) {
+        clearAuthToken();
+        setIsAuthenticated(false);
+        setCurrentUserProfile(null);
+        toast.error('Tu sesión de 4 horas ha expirado. Por favor inicia sesión nuevamente.');
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
   // Ensure role tab restrictions
   const handleSelectTab = (tab: AdminTab) => {
     if ((tab === 'profiles' || tab === 'logs') && userRole !== 'admin') {
@@ -222,11 +306,14 @@ export default function AdminPage() {
     setActiveTab(tab);
   };
 
-  const handleLoginSuccess = (email: string, role: UserRole = 'admin', name?: string) => {
+  const handleLoginSuccess = (email: string, role: UserRole = 'admin', name?: string, token?: string) => {
     setCurrentUserEmail(email);
     setUserRole(role);
     if (name) {
       setCurrentUserName(name);
+    }
+    if (token) {
+      storeAuthToken(token);
     }
     setIsAuthenticated(true);
     setActiveTab('overview');
@@ -235,14 +322,17 @@ export default function AdminPage() {
 
   const handleSignOut = async () => {
     try {
-      localStorage.removeItem('residential_admin_session');
+      clearAuthToken();
       await supabase.auth.signOut();
     } catch (err) {
       console.warn('Sign out error:', err);
     }
     setIsAuthenticated(false);
     setCurrentUserProfile(null);
-    toast.info('Sesión cerrada correctamente');
+    setCurrentUserEmail('');
+    setCurrentUserName('');
+    setUserRole('viewer');
+    toast.info('Sesión cerrada y token JWT invalidado');
   };
 
   // Categories CRUD
@@ -290,6 +380,12 @@ export default function AdminPage() {
       return;
     }
     try {
+      try {
+        await supabase.storage
+          .from('residential-directory')
+          .upload(`businesses/${biz.id}/.emptyFolderPlaceholder`, new Blob(['']), { upsert: true });
+      } catch {}
+
       const { error } = await supabase.from('businesses').upsert(biz);
       if (error) {
         toast.error(`Error al guardar negocio en Supabase: ${error.message}`);
@@ -308,6 +404,16 @@ export default function AdminPage() {
       return;
     }
     try {
+      try {
+        await Promise.allSettled(
+          batch.map((b) =>
+            supabase.storage
+              .from('residential-directory')
+              .upload(`businesses/${b.id}/.emptyFolderPlaceholder`, new Blob(['']), { upsert: true })
+          )
+        );
+      } catch {}
+
       const { error } = await supabase.from('businesses').upsert(batch);
       if (error) {
         toast.error(`Error al guardar lote en Supabase: ${error.message}`);
@@ -563,10 +669,13 @@ export default function AdminPage() {
                   businesses={businesses}
                   menuItems={menuItems}
                   promotions={promotions}
+                  events={events}
                   profiles={profiles}
                   logs={appLogs}
+                  analytics={appAnalytics}
                   setActiveTab={handleSelectTab}
                   isOnline={isOnline}
+                  onRefresh={loadData}
                 />
               )}
 

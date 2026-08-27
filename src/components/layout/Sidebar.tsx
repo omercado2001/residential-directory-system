@@ -3,7 +3,7 @@
 import React from 'react';
 import {
   LayoutDashboard, FolderTree, Building2, UtensilsCrossed,
-  Tag, Users, Terminal, ShieldCheck, Building, X, Shield, Edit3, Eye, HardDrive, Calendar
+  Tag, Users, Terminal, ShieldCheck, Building, X, Shield, Edit3, Eye, HardDrive, Calendar, Clock
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -217,6 +217,10 @@ export default function Sidebar({
                   ? 'Permisos Totales en 4 Secciones'
                   : 'Solo Consulta de 4 Secciones'}
               </span>
+            </div>
+            <div className="text-[10px] text-slate-500 flex items-center gap-1 font-semibold pt-1 border-t border-slate-200/60">
+              <Clock className="w-3 h-3 text-blue-600 shrink-0" />
+              <span>Sesión JWT Activa (4h)</span>
             </div>
           </CardContent>
         </Card>

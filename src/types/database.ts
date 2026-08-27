@@ -105,6 +105,17 @@ export interface SystemUser {
   created_at?: string;
 }
 
+export interface AppAnalyticsEvent {
+  id: string;
+  event_type: 'query' | 'search' | 'view_business' | 'view_category' | 'whatsapp_click' | 'phone_click';
+  entity_type?: 'business' | 'category' | 'menu_item' | 'promotion' | 'event' | null;
+  entity_id?: string | null;
+  search_query?: string | null;
+  platform: 'android' | 'ios' | 'mobile';
+  user_id?: string | null;
+  created_at?: string;
+}
+
 export type TableName =
   | 'categories'
   | 'businesses'
@@ -114,4 +125,5 @@ export type TableName =
   | 'user_favorites'
   | 'profiles'
   | 'system_users'
-  | 'app_logs';
+  | 'app_logs'
+  | 'app_analytics';
