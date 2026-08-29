@@ -116,12 +116,25 @@ export interface AppAnalyticsEvent {
   created_at?: string;
 }
 
+export interface EmergencyContact {
+  id: string;
+  title: string;
+  subtitle?: string | null;
+  phone: string;
+  whatsapp?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  sort_order?: number | null;
+  created_at?: string;
+}
+
 export type TableName =
   | 'categories'
   | 'businesses'
   | 'menu_items'
   | 'promotions'
   | 'events'
+  | 'emergency_contacts'
   | 'user_favorites'
   | 'profiles'
   | 'system_users'

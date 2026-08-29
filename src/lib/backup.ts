@@ -17,6 +17,7 @@ export interface BackupData {
     menu_items: any[];
     promotions: any[];
     events: any[];
+    emergency_contacts: any[];
     profiles: any[];
     system_users: any[];
     user_favorites: any[];
@@ -32,6 +33,7 @@ export async function fetchFullDatabaseBackup(): Promise<BackupData> {
     { data: menu_items },
     { data: promotions },
     { data: events },
+    { data: emergency_contacts },
     { data: profiles },
     { data: system_users },
     { data: user_favorites },
@@ -43,6 +45,7 @@ export async function fetchFullDatabaseBackup(): Promise<BackupData> {
     supabase.from('menu_items').select('*').order('name', { ascending: true }),
     supabase.from('promotions').select('*').order('created_at', { ascending: false }),
     supabase.from('events').select('*').order('created_at', { ascending: false }),
+    supabase.from('emergency_contacts').select('*').order('sort_order', { ascending: true }),
     supabase.from('profiles').select('*').order('created_at', { ascending: false }),
     supabase.from('system_users').select('*').order('created_at', { ascending: false }),
     supabase.from('user_favorites').select('*'),
@@ -56,6 +59,7 @@ export async function fetchFullDatabaseBackup(): Promise<BackupData> {
     menu_items: menu_items || [],
     promotions: promotions || [],
     events: events || [],
+    emergency_contacts: emergency_contacts || [],
     profiles: profiles || [],
     system_users: system_users || [],
     user_favorites: user_favorites || [],

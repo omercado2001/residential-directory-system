@@ -5,6 +5,7 @@ import {
   MenuItem,
   Promotion,
   CommunityEvent,
+  EmergencyContact,
   SystemUser,
   AppLog,
   AppAnalyticsEvent,
@@ -177,6 +178,45 @@ export async function saveEventApi(event: CommunityEvent): Promise<CommunityEven
 
 export async function deleteEventApi(id: string): Promise<void> {
   const { error } = await supabase.from('events').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchEmergencyContactsApi(): Promise<EmergencyContact[]> {
+  const { data, error } = await supabase
+    .from('emergency_contacts')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function saveEmergencyContactApi(contact: EmergencyContact): Promise<EmergencyContact> {
+  const payload: any = {
+    id: contact.id || crypto.randomUUID(),
+    title: contact.title.trim(),
+    subtitle: contact.subtitle && contact.subtitle.trim() ? contact.subtitle.trim() : null,
+    phone: contact.phone.trim(),
+    whatsapp: contact.whatsapp && contact.whatsapp.trim() ? contact.whatsapp.trim().replace(/\D/g, '') : null,
+    icon: contact.icon && contact.icon.trim() ? contact.icon.trim() : 'phone',
+    color: contact.color || '#3b82f6',
+    sort_order: typeof contact.sort_order === 'number' ? contact.sort_order : 1,
+    created_at: contact.created_at || new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from('emergency_contacts')
+    .upsert(payload)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function deleteEmergencyContactApi(id: string): Promise<void> {
+  const { error } = await supabase.from('emergency_contacts').delete().eq('id', id);
   if (error) throw new Error(error.message);
 }
 

@@ -3,7 +3,7 @@
 import React from 'react';
 import {
   LayoutDashboard, FolderTree, Building2, UtensilsCrossed,
-  Tag, Users, Terminal, ShieldCheck, Building, X, Shield, Edit3, Eye, HardDrive, Calendar, Clock
+  Tag, Users, Terminal, ShieldCheck, Building, X, Shield, Edit3, Eye, HardDrive, Calendar, Clock, PhoneCall
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ export type AdminTab =
   | 'menu_items'
   | 'promotions'
   | 'events'
+  | 'emergency'
   | 'storage'
   | 'profiles'
   | 'logs';
@@ -29,6 +30,7 @@ interface SidebarProps {
     menuItems: number;
     promotions: number;
     events: number;
+    emergency: number;
     profiles: number;
     logs: number;
   };
@@ -51,7 +53,6 @@ export default function Sidebar({
   isMobileOpen = false,
   onMobileClose,
 }: SidebarProps) {
-  // All possible menu items
   const allMenuItems = [
     { id: 'overview' as AdminTab, label: 'Panel Principal', icon: LayoutDashboard, badge: null, adminOnly: false },
     { id: 'categories' as AdminTab, label: 'Categorías', icon: FolderTree, badge: counts.categories, adminOnly: false },
@@ -59,6 +60,7 @@ export default function Sidebar({
     { id: 'menu_items' as AdminTab, label: 'Productos y Menú', icon: UtensilsCrossed, badge: counts.menuItems, adminOnly: false },
     { id: 'promotions' as AdminTab, label: 'Avisos y Ofertas', icon: Tag, badge: counts.promotions, adminOnly: false },
     { id: 'events' as AdminTab, label: 'Eventos Residenciales', icon: Calendar, badge: counts.events, isNew: true, adminOnly: false },
+    { id: 'emergency' as AdminTab, label: 'Números de Emergencia', icon: PhoneCall, badge: counts.emergency, adminOnly: false },
     { id: 'storage' as AdminTab, label: 'Galería de Archivos', icon: HardDrive, badge: null, adminOnly: false },
     { id: 'profiles' as AdminTab, label: 'Residentes / Usuarios', icon: Users, badge: counts.profiles, adminOnly: true },
     { id: 'logs' as AdminTab, label: 'Historial y Alertas', icon: Terminal, badge: counts.logs, danger: counts.logs > 0, adminOnly: true },

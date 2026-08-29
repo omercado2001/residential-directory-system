@@ -11,6 +11,7 @@ import BusinessesModule from '@/components/modules/BusinessesModule';
 import MenuItemsModule from '@/components/modules/MenuItemsModule';
 import PromotionsModule from '@/components/modules/PromotionsModule';
 import EventsModule from '@/components/modules/EventsModule';
+import EmergencyContactsModule from '@/components/modules/EmergencyContactsModule';
 import StorageModule from '@/components/modules/StorageModule';
 import ProfilesModule from '@/components/modules/ProfilesModule';
 import LogsModule from '@/components/modules/LogsModule';
@@ -24,6 +25,7 @@ import {
   MenuItem,
   Promotion,
   CommunityEvent,
+  EmergencyContact,
   SystemUser,
 } from '@/types/database';
 import { UserRole, normalizeRole, getRolePermissions } from '@/types/roles';
@@ -43,6 +45,7 @@ import {
   useMenuItemsQuery,
   usePromotionsQuery,
   useEventsQuery,
+  useEmergencyContactsQuery,
   useSystemUsersQuery,
   useAppLogsQuery,
   useAppAnalyticsQuery,
@@ -57,6 +60,8 @@ import {
   useDeletePromotionMutation,
   useSaveEventMutation,
   useDeleteEventMutation,
+  useSaveEmergencyContactMutation,
+  useDeleteEmergencyContactMutation,
   useSaveSystemUserMutation,
   useDeleteSystemUserMutation,
   useSaveAppLogMutation,
@@ -86,6 +91,7 @@ export default function AdminPage() {
   const { data: menuItems = [], isFetching: isFetchingMenuItems } = useMenuItemsQuery();
   const { data: promotions = [], isFetching: isFetchingPromotions } = usePromotionsQuery();
   const { data: events = [], isFetching: isFetchingEvents } = useEventsQuery();
+  const { data: emergencyContacts = [], isFetching: isFetchingEmergency } = useEmergencyContactsQuery();
   const { data: systemUsers = [], isFetching: isFetchingSystemUsers } = useSystemUsersQuery();
   const { data: appLogs = [], isFetching: isFetchingLogs } = useAppLogsQuery();
   const { data: appAnalytics = [] } = useAppAnalyticsQuery();
@@ -96,6 +102,7 @@ export default function AdminPage() {
     isFetchingMenuItems ||
     isFetchingPromotions ||
     isFetchingEvents ||
+    isFetchingEmergency ||
     isFetchingSystemUsers ||
     isFetchingLogs;
 
@@ -110,6 +117,8 @@ export default function AdminPage() {
   const deletePromotionMutation = useDeletePromotionMutation();
   const saveEventMutation = useSaveEventMutation();
   const deleteEventMutation = useDeleteEventMutation();
+  const saveEmergencyContactMutation = useSaveEmergencyContactMutation();
+  const deleteEmergencyContactMutation = useDeleteEmergencyContactMutation();
   const saveSystemUserMutation = useSaveSystemUserMutation();
   const deleteSystemUserMutation = useDeleteSystemUserMutation();
   const saveAppLogMutation = useSaveAppLogMutation();
@@ -223,6 +232,11 @@ export default function AdminPage() {
       )
       .on(
         'postgres_changes',
+        { event: '*', schema: 'public', table: 'emergency_contacts' },
+        () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.emergencyContacts })
+      )
+      .on(
+        'postgres_changes',
         { event: '*', schema: 'public', table: 'system_users' },
         () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.systemUsers })
       )
@@ -317,6 +331,7 @@ export default function AdminPage() {
           menuItems: menuItems.length,
           promotions: promotions.length,
           events: events.length,
+          emergency: emergencyContacts.length,
           profiles: systemUsers.length,
           logs: appLogs.length,
         }}
@@ -414,6 +429,20 @@ export default function AdminPage() {
               onRefresh={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.events })}
               searchTerm={searchTerm}
               canEdit={!permissions.isReadOnly}
+            />
+          )}
+
+          {activeTab === 'emergency' && (
+            <EmergencyContactsModule
+              contacts={emergencyContacts}
+              onSaveContact={async (contact) => {
+                await saveEmergencyContactMutation.mutateAsync(contact);
+              }}
+              onDeleteContact={async (id) => {
+                await deleteEmergencyContactMutation.mutateAsync(id);
+              }}
+              searchTerm={searchTerm}
+              canEdit={permissions.canEditEmergencyContacts && !permissions.isReadOnly}
             />
           )}
 

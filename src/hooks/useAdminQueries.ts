@@ -6,6 +6,7 @@ import {
   MenuItem,
   Promotion,
   CommunityEvent,
+  EmergencyContact,
   SystemUser,
   AppLog,
   AppAnalyticsEvent,
@@ -27,6 +28,9 @@ import {
   fetchEventsApi,
   saveEventApi,
   deleteEventApi,
+  fetchEmergencyContactsApi,
+  saveEmergencyContactApi,
+  deleteEmergencyContactApi,
   fetchSystemUsersApi,
   saveSystemUserApi,
   deleteSystemUserApi,
@@ -43,6 +47,7 @@ export const QUERY_KEYS = {
   menuItems: ['menu_items'] as const,
   promotions: ['promotions'] as const,
   events: ['events'] as const,
+  emergencyContacts: ['emergency_contacts'] as const,
   systemUsers: ['system_users'] as const,
   logs: ['app_logs'] as const,
   analytics: ['app_analytics'] as const,
@@ -233,6 +238,41 @@ export function useDeleteEventMutation() {
     },
     onError: (err: any) => {
       toast.error(`Error al eliminar evento: ${err?.message || 'Fallo inesperado'}`);
+    },
+  });
+}
+
+export function useEmergencyContactsQuery() {
+  return useQuery<EmergencyContact[]>({
+    queryKey: QUERY_KEYS.emergencyContacts,
+    queryFn: fetchEmergencyContactsApi,
+  });
+}
+
+export function useSaveEmergencyContactMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (contact: EmergencyContact) => saveEmergencyContactApi(contact),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.emergencyContacts });
+      toast.success(`Contacto "${data.title}" guardado con éxito`);
+    },
+    onError: (err: any) => {
+      toast.error(`Error al guardar contacto: ${err?.message || 'Fallo inesperado'}`);
+    },
+  });
+}
+
+export function useDeleteEmergencyContactMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteEmergencyContactApi(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.emergencyContacts });
+      toast.success('Contacto de emergencia eliminado con éxito');
+    },
+    onError: (err: any) => {
+      toast.error(`Error al eliminar contacto: ${err?.message || 'Fallo inesperado'}`);
     },
   });
 }
