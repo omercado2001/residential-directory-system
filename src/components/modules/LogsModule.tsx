@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { AppLog } from '@/types/database';
 import { fetchFullDatabaseBackup, downloadJsonBackup, downloadSqlBackup, BackupData } from '@/lib/backup';
 import { toast } from 'sonner';
@@ -156,23 +157,22 @@ export default function LogsModule({ logs, onAddLog, onDeleteLog, searchTerm }: 
           <p className="text-xs text-slate-500 mt-1">Registros de incidencias ({logs.length})</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3 h-9 rounded-xl">
-            <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-            <select
-              value={platformFilter}
-              onChange={(e) => {
-                setPlatformFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="bg-transparent font-bold text-xs text-slate-800 focus:outline-none cursor-pointer pr-1"
-            >
-              {PLATFORMS.map((p) => (
-                <option key={p} value={p}>
-                  {p === 'ALL' ? 'Todas las Plataformas' : p.toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SearchableSelect
+            options={[
+              { value: 'ALL', label: 'Todas las Plataformas' },
+              { value: 'android', label: 'Android (App Móvil)' },
+              { value: 'ios', label: 'iOS (App Móvil)' },
+              { value: 'web', label: 'Panel Web' },
+            ]}
+            value={platformFilter}
+            onChange={(val) => {
+              setPlatformFilter(val);
+              setCurrentPage(1);
+            }}
+            placeholder="Filtrar por plataforma..."
+            icon={Filter}
+            className="w-56"
+          />
         </div>
       </div>
 

@@ -743,21 +743,21 @@ export default function StorageModule({
           />
 
           {/* Usage Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 px-3 h-9 rounded-xl text-xs font-bold text-slate-700">
-            <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-            <select
-              value={usageFilter}
-              onChange={(e) => {
-                setUsageFilter(e.target.value as any);
-                setCurrentPage(1);
-              }}
-              className="bg-transparent focus:outline-none cursor-pointer pr-1"
-            >
-              <option value="ALL">Todos los Estados</option>
-              <option value="IN_USE">🔒 En Uso (Referenciadas)</option>
-              <option value="UNUSED">✨ Sin Usar (Libres)</option>
-            </select>
-          </div>
+          <SearchableSelect
+            options={[
+              { value: 'ALL', label: 'Todos los Estados' },
+              { value: 'IN_USE', label: '🔒 En Uso (Referenciadas)' },
+              { value: 'UNUSED', label: '✨ Sin Usar (Libres)' },
+            ]}
+            value={usageFilter}
+            onChange={(val) => {
+              setUsageFilter(val as any);
+              setCurrentPage(1);
+            }}
+            placeholder="Filtrar por estado..."
+            icon={Filter}
+            className="w-52"
+          />
 
           {hasActiveFilters && (
             <Button

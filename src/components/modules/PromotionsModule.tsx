@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { TablePagination } from '@/components/ui/table-pagination';
 import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Promotion, Business, Category } from '@/types/database';
 import { toast } from 'sonner';
 
@@ -290,23 +291,31 @@ export default function PromotionsModule({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-slate-700 text-xs font-semibold block">Comercio</label>
-                <select
+                <SearchableSelect
+                  options={businesses.map((b) => ({
+                    value: b.id,
+                    label: b.name,
+                    sublabel: b.address || b.tags || undefined,
+                    icon: Building2,
+                  }))}
                   value={businessId}
-                  onChange={(e) => handleBusinessChange(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                >
-                  {businesses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
+                  onChange={(val) => handleBusinessChange(val)}
+                  placeholder="Selecciona un comercio..."
+                  searchPlaceholder="Escribe para buscar comercio..."
+                  icon={Building2}
+                  className="w-full"
+                />
               </div>
               <div className="space-y-1.5">
                 <label className="text-slate-700 text-xs font-semibold block">Categoría</label>
-                <select
+                <SearchableSelect
+                  options={categories.map((c) => ({ value: c.id, label: c.name }))}
                   value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                >
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                  onChange={setCategoryId}
+                  placeholder="Selecciona una categoría..."
+                  searchPlaceholder="Escribe para buscar categoría..."
+                  className="w-full"
+                />
               </div>
             </div>
 

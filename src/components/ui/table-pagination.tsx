@@ -3,6 +3,7 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SearchableSelect } from './searchable-select';
 
 interface TablePaginationProps {
   currentPage: number;
@@ -56,22 +57,18 @@ export function TablePagination({
         </span>
 
         {onItemsPerPageChange && (
-          <div className="flex items-center gap-1.5 ml-2 border-l border-slate-200 pl-3">
+          <div className="flex items-center gap-2 ml-2 border-l border-slate-200 pl-3">
             <span className="text-slate-500">Por página:</span>
-            <select
-              value={itemsPerPage}
-              onChange={(e) => {
-                onItemsPerPageChange(Number(e.target.value));
+            <SearchableSelect
+              options={pageSizeOptions.map((opt) => ({ value: String(opt), label: String(opt) }))}
+              value={String(itemsPerPage)}
+              onChange={(val) => {
+                onItemsPerPageChange(Number(val));
                 onPageChange(1);
               }}
-              className="h-7 px-2 rounded-md border border-slate-200 bg-slate-50 text-slate-800 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-slate-900"
-            >
-              {pageSizeOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+              allowSearch={false}
+              className="w-20"
+            />
           </div>
         )}
       </div>

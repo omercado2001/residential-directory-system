@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { TablePagination } from '@/components/ui/table-pagination';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ImageDropzone } from '@/components/ui/image-dropzone';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { CommunityEvent } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -185,24 +186,18 @@ export default function EventsModule({
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           {/* Category Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 px-3 h-9 rounded-xl text-xs font-bold text-slate-700">
-            <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-            <select
-              value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="bg-transparent focus:outline-none cursor-pointer pr-1"
-            >
-              <option value="ALL">Todas las Categorías</option>
-              {EVENT_CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SearchableSelect
+            options={EVENT_CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+            value={selectedCategory}
+            onChange={(val) => {
+              setSelectedCategory(val);
+              setCurrentPage(1);
+            }}
+            placeholder="Filtrar por categoría..."
+            allOptionLabel="Todas las Categorías"
+            icon={Filter}
+            className="w-56"
+          />
 
           <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-2 rounded-xl">
             Total: {filteredEvents.length} {filteredEvents.length === 1 ? 'evento' : 'eventos'}
@@ -366,17 +361,14 @@ export default function EventsModule({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-slate-700 font-semibold block">Categoría</label>
-                <select
+                <SearchableSelect
+                  options={EVENT_CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md border border-slate-200 bg-white text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 cursor-pointer"
-                >
-                  {EVENT_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCategory}
+                  placeholder="Selecciona una categoría..."
+                  searchPlaceholder="Escribe para buscar categoría..."
+                  className="w-full"
+                />
               </div>
 
               <div className="space-y-1.5">

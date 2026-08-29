@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { UtensilsCrossed, Plus, Edit, Trash2, Filter } from 'lucide-react';
+import { UtensilsCrossed, Plus, Edit, Trash2, Filter, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { TablePagination } from '@/components/ui/table-pagination';
 import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { MenuItem, Business } from '@/types/database';
 
 interface MenuItemsModuleProps {
@@ -115,20 +116,24 @@ export default function MenuItemsModule({
           <p className="text-xs text-slate-500 mt-1">Platillos y productos disponibles ({menuItems.length})</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3 h-9 rounded-xl">
-            <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-            <select
-              value={selectedBusinessFilter}
-              onChange={(e) => {
-                setSelectedBusinessFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="bg-transparent font-bold text-xs text-slate-800 focus:outline-none cursor-pointer pr-1"
-            >
-              <option value="ALL">Todos los Negocios</option>
-              {businesses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </div>
+          <SearchableSelect
+            options={businesses.map((b) => ({
+              value: b.id,
+              label: b.name,
+              sublabel: b.address || b.tags || undefined,
+              icon: Building2,
+            }))}
+            value={selectedBusinessFilter}
+            onChange={(val) => {
+              setSelectedBusinessFilter(val);
+              setCurrentPage(1);
+            }}
+            placeholder="Filtrar por negocio..."
+            allOptionLabel="Todos los Negocios"
+            searchPlaceholder="Escribe para buscar comercio..."
+            icon={Building2}
+            className="w-64"
+          />
           {canEdit ? (
             <Button onClick={openCreateModal} className="font-bold shadow-md bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 h-9 flex items-center gap-2">
               <Plus className="w-4 h-4" /><span>Nuevo Producto</span>
@@ -216,10 +221,20 @@ export default function MenuItemsModule({
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <label className="text-slate-700 text-xs font-semibold block">Negocio al que pertenece</label>
-              <select value={businessId} onChange={(e) => setBusinessId(e.target.value)}
-                className="w-full h-9 px-3 rounded-md border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900">
-                {businesses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+              <SearchableSelect
+                options={businesses.map((b) => ({
+                  value: b.id,
+                  label: b.name,
+                  sublabel: b.address || b.tags || undefined,
+                  icon: Building2,
+                }))}
+                value={businessId}
+                onChange={setBusinessId}
+                placeholder="Selecciona un comercio..."
+                searchPlaceholder="Escribe para buscar comercio..."
+                icon={Building2}
+                className="w-full"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">

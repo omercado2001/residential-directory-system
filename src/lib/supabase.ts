@@ -11,12 +11,10 @@ const supabaseAnonKey =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
   'sb_publishable_Ve1Nqj9PY_AiE-B1vnqyBg_7oEWCJ73';
 
-// Custom fetch interceptor to dynamically inject the active 4-hour JWT without conflicting with PostgREST's internal key
 const customAuthFetch: typeof fetch = async (input, init = {}) => {
   const token = getStoredAuthToken();
   const headers = new Headers(init.headers || {});
 
-  // 1. Maintain required Supabase project apikey and authorization
   if (!headers.has('apikey')) {
     headers.set('apikey', supabaseAnonKey);
   }
@@ -24,7 +22,6 @@ const customAuthFetch: typeof fetch = async (input, init = {}) => {
     headers.set('Authorization', `Bearer ${supabaseAnonKey}`);
   }
 
-  // 2. Attach application 4-hour JWT token in custom headers for all requests
   if (token) {
     if (isTokenExpired(token)) {
       clearAuthToken();

@@ -12,6 +12,7 @@ import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { BusinessBulkImportDrawer } from './BusinessBulkImportDrawer';
 import { renderCategoryIcon } from './CategoriesModule';
+import { SearchableSelect, SelectOption } from '@/components/ui/searchable-select';
 import { Business, Category } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -236,20 +237,18 @@ export default function BusinessesModule({
             )}
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 px-3 h-9 rounded-xl">
-            <Filter className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-            <select
-              value={selectedCategoryFilter}
-              onChange={(e) => {
-                setSelectedCategoryFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="bg-transparent font-bold text-xs text-slate-800 focus:outline-none cursor-pointer pr-1"
-            >
-              <option value="ALL">Todas las Categorías</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+          <SearchableSelect
+            options={categories.map((c) => ({ value: c.id, label: c.name }))}
+            value={selectedCategoryFilter}
+            onChange={(val) => {
+              setSelectedCategoryFilter(val);
+              setCurrentPage(1);
+            }}
+            placeholder="Filtrar por categoría..."
+            allOptionLabel="Todas las Categorías"
+            icon={Filter}
+            className="w-56"
+          />
 
           {canEdit ? (
             <>
@@ -395,10 +394,14 @@ export default function BusinessesModule({
               </div>
               <div className="space-y-1.5">
                 <label className="text-slate-700 text-xs font-semibold block">Categoría</label>
-                <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full h-9 px-3 rounded-md border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 transition">
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <SearchableSelect
+                  options={categories.map((c) => ({ value: c.id, label: c.name }))}
+                  value={categoryId}
+                  onChange={setCategoryId}
+                  placeholder="Selecciona una categoría..."
+                  searchPlaceholder="Escribe para buscar categoría..."
+                  className="w-full"
+                />
               </div>
             </div>
 

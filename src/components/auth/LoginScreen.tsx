@@ -32,132 +32,53 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
     setIsLoading(true);
     setErrorMsg('');
-
     try {
-      // 1. Check custom system_users table in database (if created)
-      try {
-        const { data: sysUser, error: sysError } = await supabase
-          .from('system_users')
-          .select('*')
-          .or(`username.eq.${input},email.eq.${input}`)
-          .eq('password', pass)
-          .maybeSingle();
+      const { data: sysUser, error: sysError } = await supabase
+        .from('system_users')
+        .select('*')
+        .or(`username.eq.${input},email.eq.${input}`)
+        .eq('password', pass)
+        .maybeSingle();
 
-        if (!sysError && sysUser) {
-          const role = normalizeRole(sysUser.role);
-          const name = sysUser.full_name || sysUser.username;
-          const email = sysUser.email || input;
-          const userId = sysUser.id;
+      if (sysError) {
+        throw new Error(sysError.message);
+      }
 
-          // Generate Signed JWT with 4 hours expiration
-          const token = await signJwt({
+      if (sysUser) {
+        const role = normalizeRole(sysUser.role);
+        const name = sysUser.full_name || sysUser.username;
+        const email = sysUser.email || input;
+        const userId = sysUser.id;
+
+        const token = await signJwt(
+          {
             sub: userId,
             email,
             name,
             role,
-          }, TOKEN_DURATION_SECONDS);
+          },
+          TOKEN_DURATION_SECONDS
+        );
 
-          storeAuthToken(token);
+        storeAuthToken(token);
 
-          // Save session locally
-          localStorage.setItem('residential_admin_session', JSON.stringify({
+        localStorage.setItem(
+          'residential_admin_session',
+          JSON.stringify({
             userId,
             email,
             name,
             role,
             jwt: token,
-          }));
-
-          toast.success(`Bienvenido de vuelta, ${name} (Sesión JWT activa por 4 horas)`);
-          onLoginSuccess(email, role, name, token);
-          return;
-        }
-      } catch {
-        // system_users table not yet created, proceed to Supabase Auth & profiles check
-      }
-
-      // 2. Check Supabase Auth with email & password
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: input,
-        password: pass,
-      });
-
-      if (!authError && authData?.user) {
-        // Fetch matching profile from database profiles table
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', authData.user.id)
-          .maybeSingle();
-
-        const role = normalizeRole(
-          profile?.role || authData.user.user_metadata?.role || 'admin'
+          })
         );
-        const name =
-          profile?.full_name || authData.user.user_metadata?.full_name || input;
-        const email = authData.user.email || input;
-        const userId = authData.user.id;
 
-        // Generate Signed JWT with 4 hours expiration
-        const token = await signJwt({
-          sub: userId,
-          email,
-          name,
-          role,
-        }, TOKEN_DURATION_SECONDS);
-
-        storeAuthToken(token);
-
-        localStorage.setItem('residential_admin_session', JSON.stringify({
-          userId,
-          email,
-          name,
-          role,
-          jwt: token,
-        }));
-
-        toast.success(`Bienvenido, ${name} (Sesión JWT activa por 4 horas)`);
+        toast.success(`Bienvenido de vuelta, ${name}`);
         onLoginSuccess(email, role, name, token);
         return;
       }
 
-      // 3. Check profiles table in database directly
-      const { data: profileMatch } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('email', input)
-        .maybeSingle();
-
-      if (profileMatch && (pass === 'admin123' || pass === 'Admin123!' || pass === 'Editor123!' || pass === 'Lector123!')) {
-        const role = normalizeRole(profileMatch.role);
-        const name = profileMatch.full_name || input;
-        const userId = profileMatch.id;
-
-        // Generate Signed JWT with 4 hours expiration
-        const token = await signJwt({
-          sub: userId,
-          email: input,
-          name,
-          role,
-        }, TOKEN_DURATION_SECONDS);
-
-        storeAuthToken(token);
-
-        localStorage.setItem('residential_admin_session', JSON.stringify({
-          userId,
-          email: input,
-          name,
-          role,
-          jwt: token,
-        }));
-
-        toast.success(`Bienvenido, ${name} (Sesión JWT activa por 4 horas)`);
-        onLoginSuccess(input, role, name, token);
-        return;
-      }
-
-      // Credential verification failed
-      setErrorMsg('Usuario o contraseña incorrectos. Verifica que el usuario exista en la base de datos.');
+      setErrorMsg('Usuario o contraseña incorrectos. Verifica que el usuario exista en system_users.');
     } catch (err: any) {
       console.error('Error al autenticar:', err);
       setErrorMsg('Error de conexión al verificar en la base de datos.');
@@ -168,12 +89,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-4 relative overflow-hidden font-sans">
-      {/* Background Ambient Glows */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md space-y-6 relative z-10">
-        {/* Brand Header */}
         <div className="text-center space-y-2">
           <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mx-auto shadow-lg shadow-blue-500/10">
             <Building2 className="w-8 h-8 text-blue-600" />
@@ -181,11 +100,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Directorio Residencial</h1>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[11px] font-bold text-blue-700">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Autenticación Segura JWT (4 Horas)</span>
+            <span>Autenticación Segura JWT</span>
           </div>
         </div>
 
-        {/* Login Card */}
         <Card className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden">
           <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
             <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -245,7 +163,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Verificando y Generando JWT...</span>
+                    <span>Verificando...</span>
                   </>
                 ) : (
                   <>
@@ -263,9 +181,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           </CardContent>
         </Card>
 
-        {/* Footer info */}
         <div className="text-center text-[11px] text-slate-500">
-          Directorio Residencial &copy; {new Date().getFullYear()} — Autenticación JWT
+          Directorio Residencial &copy; {new Date().getFullYear()}
         </div>
       </div>
     </div>

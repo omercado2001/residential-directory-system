@@ -25,9 +25,6 @@ export interface BackupData {
   };
 }
 
-/**
- * Fetches all database tables and permissions to generate a complete backup
- */
 export async function fetchFullDatabaseBackup(): Promise<BackupData> {
   const [
     { data: categories },
@@ -82,9 +79,6 @@ export async function fetchFullDatabaseBackup(): Promise<BackupData> {
   };
 }
 
-/**
- * Generates and downloads a JSON Backup file
- */
 export function downloadJsonBackup(backup: BackupData, filenamePrefix = 'Backup_Directorio_Residencial'): void {
   const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `${filenamePrefix}_${dateStr}.json`;
@@ -100,18 +94,11 @@ export function downloadJsonBackup(backup: BackupData, filenamePrefix = 'Backup_
   URL.revokeObjectURL(url);
 }
 
-/**
- * Generates and downloads a PostgreSQL restoration SQL script
- */
 export function downloadSqlBackup(backup: BackupData, filenamePrefix = 'Backup_Directorio_Residencial'): void {
   const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `${filenamePrefix}_${dateStr}.sql`;
 
-  let sql = `-- ========================================================\n`;
-  sql += `-- Respaldo Completo de Base de Datos - Directorio Residencial\n`;
-  sql += `-- Fecha de Generación: ${backup.metadata.generated_at}\n`;
-  sql += `-- Total de Registros: ${backup.metadata.total_records}\n`;
-  sql += `-- ========================================================\n\n`;
+  let sql = `-- Respaldo de Base de Datos - Directorio Residencial\n\n`;
 
   const escapeSql = (val: any): string => {
     if (val === null || val === undefined) return 'NULL';
@@ -124,9 +111,9 @@ export function downloadSqlBackup(backup: BackupData, filenamePrefix = 'Backup_D
   };
 
   const generateTableSql = (tableName: string, rows: any[]) => {
-    if (!rows || rows.length === 0) return `-- Tabla ${tableName}: 0 registros\n\n`;
+    if (!rows || rows.length === 0) return '';
 
-    let out = `-- Tabla: ${tableName} (${rows.length} registros)\n`;
+    let out = `-- Tabla: ${tableName}\n`;
     const cols = Object.keys(rows[0]);
     const colsList = cols.map((c) => `"${c}"`).join(', ');
 
