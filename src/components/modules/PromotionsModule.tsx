@@ -84,7 +84,8 @@ export default function PromotionsModule({
   const openEditModal = (p: Promotion) => {
     setEditingPromo(p);
     setBusinessId(p.business_id);
-    setCategoryId(p.category_id || '');
+    const biz = businesses.find((b) => b.id === p.business_id);
+    setCategoryId(p.category_id || biz?.category_id || '');
     setTitle(p.title);
     setDescription(p.description || '');
     setBadge(p.badge || '');
@@ -307,7 +308,12 @@ export default function PromotionsModule({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-slate-700 text-xs font-semibold block">Categoría</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-700 text-xs font-semibold block">Categoría</label>
+                  <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-1.5 py-0.5 rounded">
+                    Auto-enlazada al comercio
+                  </span>
+                </div>
                 <SearchableSelect
                   options={categories.map((c) => ({ value: c.id, label: c.name }))}
                   value={categoryId}
