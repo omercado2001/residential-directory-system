@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Tag, Plus, Edit, Trash2, Calendar, Building2, ImageOff } from 'lucide-react';
+import { Tag, Plus, Edit, Trash2, Calendar, Building2, ImageOff, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +53,7 @@ export default function PromotionsModule({
   const [validUntil, setValidUntil] = useState('');
   const [image, setImage] = useState('');
   const [ribbon, setRibbon] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const filteredPromotions = promotions.filter((p) =>
     p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -121,8 +122,7 @@ export default function PromotionsModule({
     const selectedBiz = businesses.find((b) => b.id === finalBizId);
     const finalCatId = categoryId || selectedBiz?.category_id || categories[0]?.id || '';
 
-    // Date formatted as YYYY-MM-DD for PostgreSQL DATE column
-    const formattedDate = validUntil ? validUntil.split('T')[0] : null;
+    const formattedDate = validUntil && validUntil.trim() ? validUntil.trim().split('T')[0] : null;
 
     const payload: Promotion = {
       id: editingPromo?.id || crypto.randomUUID(),
@@ -141,16 +141,30 @@ export default function PromotionsModule({
     if (editingPromo) {
       setConfirmUpdatePayload(payload);
     } else {
-      await onSavePromotion(payload);
-      setIsModalOpen(false);
+      setIsSubmitting(true);
+      try {
+        await onSavePromotion(payload);
+        setIsModalOpen(false);
+      } catch (err: any) {
+        toast.error(`Error al guardar: ${err?.message || 'Fallo de conexión'}`);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
   const executeUpdate = async () => {
     if (!confirmUpdatePayload) return;
-    await onSavePromotion(confirmUpdatePayload);
-    setConfirmUpdatePayload(null);
-    setIsModalOpen(false);
+    setIsSubmitting(true);
+    try {
+      await onSavePromotion(confirmUpdatePayload);
+      setConfirmUpdatePayload(null);
+      setIsModalOpen(false);
+    } catch (err: any) {
+      toast.error(`Error al actualizar: ${err?.message || 'Fallo de conexión'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const executeDelete = async () => {
@@ -356,9 +370,16 @@ export default function PromotionsModule({
           </div>
 
           <DialogFooter>
-            <Button onClick={() => setIsModalOpen(false)} variant="secondary" className="rounded-full font-semibold text-xs">Cancelar</Button>
-            <Button onClick={handleFormSubmit} className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs">
-              {editingPromo ? 'Actualizar Promoción' : 'Guardar Promoción'}
+            <Button onClick={() => setIsModalOpen(false)} disabled={isSubmitting} variant="secondary" className="rounded-full font-semibold text-xs">Cancelar</Button>
+            <Button onClick={handleFormSubmit} disabled={isSubmitting} className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs flex items-center gap-1.5">
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Guardando...</span>
+                </>
+              ) : (
+                <span>{editingPromo ? 'Actualizar Promoción' : 'Guardar Promoción'}</span>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

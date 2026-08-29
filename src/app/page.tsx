@@ -397,8 +397,12 @@ export default function AdminPage() {
               promotions={promotions}
               businesses={businesses}
               categories={categories}
-              onSavePromotion={(promo) => savePromotionMutation.mutateAsync(promo).then(() => {})}
-              onDeletePromotion={(id) => deletePromotionMutation.mutateAsync(id).then(() => {})}
+              onSavePromotion={async (promo) => {
+                await savePromotionMutation.mutateAsync(promo);
+              }}
+              onDeletePromotion={async (id) => {
+                await deletePromotionMutation.mutateAsync(id);
+              }}
               searchTerm={searchTerm}
               canEdit={permissions.canEditPromotions && !permissions.isReadOnly}
             />

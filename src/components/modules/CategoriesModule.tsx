@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import {
-  Plus, Edit, Trash2, Tag, Check, FolderTree,
+  Plus, Edit, Trash2, Tag, FolderTree,
   Utensils, Coffee, ShoppingBag, Store, Briefcase, HeartPulse,
   Car, Wrench, Home, Scissors, Sparkles, Film, Gift, Laptop,
   Truck, Smartphone, Dumbbell, BookOpen, Music, Camera,
@@ -22,11 +22,6 @@ interface CategoriesModuleProps {
   searchTerm: string;
   canEdit?: boolean;
 }
-
-const COLOR_PRESETS = [
-  '#3b82f6', '#06b6d4', '#10b981', '#f59e0b',
-  '#ef4444', '#8b5cf6', '#ec4899', '#64748b'
-];
 
 export const AVAILABLE_ICONS: { name: string; label: string; icon: LucideIcon }[] = [
   { name: 'Utensils', label: 'Restaurantes', icon: Utensils },
@@ -72,14 +67,11 @@ export default function CategoriesModule({
   const [id, setId] = useState('');
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
-  const [color, setColor] = useState('#3b82f6');
   const [icon, setIcon] = useState('Utensils');
 
-  // Confirmation dialogs state
   const [confirmDeleteCat, setConfirmDeleteCat] = useState<Category | null>(null);
   const [confirmUpdatePayload, setConfirmUpdatePayload] = useState<Category | null>(null);
 
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(8);
 
@@ -97,43 +89,51 @@ export default function CategoriesModule({
   const openCreateModal = () => {
     setEditingCategory(null);
     setId('');
-    setName(''); setSlug(''); setColor('#3b82f6'); setIcon('Utensils');
+    setName('');
+    setSlug('');
+    setIcon('Utensils');
     setIsOpen(true);
   };
 
   const openEditModal = (cat: Category) => {
     setEditingCategory(cat);
-    setId(cat.id); setName(cat.name); setSlug(cat.slug);
-    setColor(cat.color || '#3b82f6'); setIcon(cat.icon || 'Utensils');
+    setId(cat.id);
+    setName(cat.name);
+    setSlug(cat.slug);
+    setIcon(cat.icon || 'Utensils');
     setIsOpen(true);
   };
 
   const handleNameChange = (val: string) => {
     setName(val);
     if (!editingCategory) {
-      const generatedSlug = val.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      const generatedSlug = val
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
       setSlug(generatedSlug);
     }
   };
 
   const handleFormSubmit = async () => {
-    if (!name) return;
-    const finalSlug = slug || name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-    const finalId = id || editingCategory?.id || finalSlug || `cat-${Date.now()}`;
+    if (!name.trim() || !slug.trim()) return;
+
+    const generatedId = id || slug.trim().toLowerCase();
+
     const payload: Category = {
-      id: finalId,
-      name,
-      slug: finalSlug,
-      color,
-      icon,
+      id: generatedId,
+      name: name.trim(),
+      slug: slug.trim().toLowerCase(),
+      icon: icon || 'Utensils',
+      color: editingCategory?.color || '#3b82f6',
       created_at: editingCategory?.created_at || new Date().toISOString(),
     };
 
     if (editingCategory) {
-      // Prompt confirmation before updating
       setConfirmUpdatePayload(payload);
     } else {
-      // Direct creation
       await onSaveCategory(payload);
       setIsOpen(false);
     }
@@ -154,7 +154,6 @@ export default function CategoriesModule({
 
   return (
     <div className="space-y-6 animate-fadeIn text-slate-900">
-      {/* Action Header */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -173,7 +172,6 @@ export default function CategoriesModule({
         )}
       </div>
 
-      {/* Styled Table */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -181,38 +179,25 @@ export default function CategoriesModule({
               <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-extrabold uppercase text-slate-500 tracking-wider">
                 <th className="py-3.5 px-4">NOMBRE</th>
                 <th className="py-3.5 px-4">CÓDIGO</th>
-                <th className="py-3.5 px-4">COLOR DISTINTIVO</th>
                 <th className="py-3.5 px-4">ÍCONO VISUAL</th>
                 {canEdit && <th className="py-3.5 px-4 text-right">ACCIONES</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {paginatedCategories.length === 0 ? (
-                <tr><td colSpan={canEdit ? 5 : 4} className="text-center py-8 text-slate-500 text-xs">No hay categorías registradas.</td></tr>
+                <tr><td colSpan={canEdit ? 4 : 3} className="text-center py-8 text-slate-500 text-xs">No hay categorías registradas.</td></tr>
               ) : (
                 paginatedCategories.map((cat) => (
                   <tr key={cat.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-slate-900">
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-3.5 h-3.5 rounded-full inline-block shrink-0" style={{ backgroundColor: cat.color || '#3b82f6' }} />
-                        <span>{cat.name}</span>
-                      </div>
+                      <span>{cat.name}</span>
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-mono font-semibold border border-blue-200">{cat.slug}</span>
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-slate-600">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 rounded border border-slate-300" style={{ backgroundColor: cat.color || '#3b82f6' }} />
-                        <span>{cat.color}</span>
-                      </div>
-                    </td>
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
-                        <div
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 shadow-xs"
-                          style={{ backgroundColor: cat.color || '#3b82f6' }}
-                        >
+                        <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
                           {renderCategoryIcon(cat.icon, 'w-3.5 h-3.5')}
                         </div>
                         <span className="font-semibold text-slate-700">{cat.icon}</span>
@@ -237,7 +222,6 @@ export default function CategoriesModule({
           </table>
         </div>
 
-        {/* Pagination */}
         <TablePagination
           currentPage={currentPage}
           totalPages={totalPages}
@@ -249,7 +233,6 @@ export default function CategoriesModule({
         />
       </div>
 
-      {/* Dialog Modal */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -264,21 +247,7 @@ export default function CategoriesModule({
               <label className="text-slate-700 text-xs font-semibold block">Identificador o Código corto</label>
               <Input placeholder="ej-pulperias-y-super" value={slug} onChange={(e) => setSlug(e.target.value)} required />
             </div>
-            <div>
-              <label className="block text-xs font-semibold mb-2 text-slate-700">Color Representativo</label>
-              <div className="flex items-center space-x-2 mb-3">
-                {COLOR_PRESETS.map((preset) => (
-                  <button type="button" key={preset} onClick={() => setColor(preset)}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition ${color === preset ? 'border-slate-900 scale-110' : 'border-transparent opacity-80'}`}
-                    style={{ backgroundColor: preset }}>
-                    {color === preset && <Check className="w-3.5 h-3.5 text-white" />}
-                  </button>
-                ))}
-              </div>
-              <Input value={color} onChange={(e) => setColor(e.target.value)} />
-            </div>
 
-            {/* Visual Icon Grid Selector */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-semibold text-slate-700 block">
@@ -307,9 +276,8 @@ export default function CategoriesModule({
                     >
                       <div
                         className={`w-7 h-7 rounded-lg flex items-center justify-center mb-1 transition-colors ${
-                          isSelected ? 'text-white' : 'text-slate-600 bg-slate-100'
+                          isSelected ? 'bg-blue-600 text-white' : 'text-slate-600 bg-slate-100'
                         }`}
-                        style={{ backgroundColor: isSelected ? color || '#3b82f6' : undefined }}
                       >
                         <IconComp className="w-4 h-4" />
                       </div>
@@ -331,7 +299,6 @@ export default function CategoriesModule({
         </DialogContent>
       </Dialog>
 
-      {/* Confirmation Dialog for Delete */}
       <ConfirmDialog
         isOpen={Boolean(confirmDeleteCat)}
         onClose={() => setConfirmDeleteCat(null)}
@@ -343,7 +310,6 @@ export default function CategoriesModule({
         variant="danger"
       />
 
-      {/* Confirmation Dialog for Update */}
       <ConfirmDialog
         isOpen={Boolean(confirmUpdatePayload)}
         onClose={() => setConfirmUpdatePayload(null)}

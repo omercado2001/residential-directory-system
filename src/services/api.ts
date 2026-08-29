@@ -125,9 +125,23 @@ export async function fetchPromotionsApi(): Promise<Promotion[]> {
 }
 
 export async function savePromotionApi(promotion: Promotion): Promise<Promotion> {
+  const payload: any = {
+    id: promotion.id || crypto.randomUUID(),
+    business_id: promotion.business_id,
+    category_id: promotion.category_id || null,
+    title: promotion.title.trim(),
+    description: promotion.description && promotion.description.trim() ? promotion.description.trim() : null,
+    badge: promotion.badge && promotion.badge.trim() ? promotion.badge.trim() : null,
+    badge_color: promotion.badge_color || '#ef4444',
+    valid_until: promotion.valid_until && String(promotion.valid_until).trim() ? String(promotion.valid_until).trim().split('T')[0] : null,
+    image: promotion.image && promotion.image.trim() ? promotion.image.trim() : null,
+    ribbon: promotion.ribbon && promotion.ribbon.trim() ? promotion.ribbon.trim() : null,
+    created_at: promotion.created_at || new Date().toISOString(),
+  };
+
   const { data, error } = await supabase
     .from('promotions')
-    .upsert(promotion)
+    .upsert(payload)
     .select()
     .single();
 
