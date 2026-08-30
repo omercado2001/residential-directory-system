@@ -166,9 +166,22 @@ export async function fetchEventsApi(): Promise<CommunityEvent[]> {
 }
 
 export async function saveEventApi(event: CommunityEvent): Promise<CommunityEvent> {
+  const payload: any = {
+    id: event.id || crypto.randomUUID(),
+    title: event.title.trim(),
+    category: event.category && event.category.trim() ? event.category.trim() : 'Comunitario 🏘️',
+    location: event.location && event.location.trim() ? event.location.trim() : null,
+    event_date: event.event_date && event.event_date.trim() ? event.event_date.trim() : null,
+    description: event.description && event.description.trim() ? event.description.trim() : null,
+    organizer_phone: event.organizer_phone && event.organizer_phone.trim() ? event.organizer_phone.trim() : null,
+    whatsapp: event.whatsapp && event.whatsapp.trim() ? event.whatsapp.trim().replace(/\D/g, '') : null,
+    image: event.image && event.image.trim() ? event.image.trim() : null,
+    created_at: event.created_at || new Date().toISOString(),
+  };
+
   const { data, error } = await supabase
     .from('events')
-    .upsert(event)
+    .upsert(payload)
     .select()
     .single();
 

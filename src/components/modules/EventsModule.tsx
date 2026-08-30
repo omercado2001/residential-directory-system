@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import {
   Calendar, MapPin, Phone, MessageSquare, Plus, Edit, Trash2,
-  Search, Filter, Sparkles, Clock, PartyPopper, Users, Tag, Image as ImageIcon
+  Search, Filter, Sparkles, Clock, PartyPopper, Users, Tag, Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,13 +16,13 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ImageDropzone } from '@/components/ui/image-dropzone';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { CommunityEvent } from '@/types/database';
-import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 interface EventsModuleProps {
   events: CommunityEvent[];
   searchTerm: string;
-  onRefresh: () => void;
+  onSaveEvent: (event: CommunityEvent) => Promise<void>;
+  onDeleteEvent: (id: string) => Promise<void>;
   canEdit?: boolean;
 }
 
@@ -39,13 +40,15 @@ const EVENT_CATEGORIES = [
 export default function EventsModule({
   events,
   searchTerm,
-  onRefresh,
+  onSaveEvent,
+  onDeleteEvent,
   canEdit = true,
 }: EventsModuleProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CommunityEvent | null>(null);
   const [confirmDeleteEvent, setConfirmDeleteEvent] = useState<CommunityEvent | null>(null);
+  const [confirmUpdatePayload, setConfirmUpdatePayload] = useState<CommunityEvent | null>(null);
 
   // Form states
   const [title, setTitle] = useState('');
@@ -108,53 +111,52 @@ export default function EventsModule({
     setIsModalOpen(true);
   };
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) {
+  const handleFormSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
       toast.error('Por favor ingresa el título del evento');
       return;
     }
 
+    const payload: CommunityEvent = {
+      id: editingEvent?.id || crypto.randomUUID(),
+      title: trimmedTitle,
+      category: category.trim() || 'Comunitario 🏘️',
+      location: location.trim() || null,
+      event_date: eventDate.trim() || null,
+      description: description.trim() || null,
+      organizer_phone: organizerPhone.trim() || null,
+      whatsapp: whatsapp.trim() || null,
+      image: image.trim() || null,
+      created_at: editingEvent?.created_at || new Date().toISOString(),
+    };
+
+    if (editingEvent) {
+      setConfirmUpdatePayload(payload);
+    } else {
+      setIsSubmitting(true);
+      try {
+        await onSaveEvent(payload);
+        setIsModalOpen(false);
+      } catch (err: any) {
+        toast.error(`Error al publicar evento: ${err?.message || 'Fallo de conexión'}`);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  const executeUpdate = async () => {
+    if (!confirmUpdatePayload) return;
     setIsSubmitting(true);
     try {
-      const payload: Partial<CommunityEvent> = {
-        title: title.trim(),
-        category: category.trim(),
-        location: location.trim() || null,
-        event_date: eventDate.trim() || null,
-        description: description.trim() || null,
-        organizer_phone: organizerPhone.trim() || null,
-        whatsapp: whatsapp.trim() || null,
-        image: image.trim() || null,
-      };
-
-      if (editingEvent) {
-        const { error } = await supabase
-          .from('events')
-          .update(payload)
-          .eq('id', editingEvent.id);
-
-        if (error) throw error;
-        toast.success('Evento actualizado exitosamente');
-      } else {
-        const newId = crypto.randomUUID();
-        const { error } = await supabase
-          .from('events')
-          .insert({
-            id: newId,
-            ...payload,
-            created_at: new Date().toISOString(),
-          });
-
-        if (error) throw error;
-        toast.success('Nuevo evento publicado exitosamente');
-      }
-
+      await onSaveEvent(confirmUpdatePayload);
+      setConfirmUpdatePayload(null);
       setIsModalOpen(false);
-      onRefresh();
     } catch (err: any) {
-      console.error('Error al guardar evento:', err);
-      toast.error(`Error al guardar evento: ${err.message}`);
+      toast.error(`Error al actualizar evento: ${err?.message || 'Fallo de conexión'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -162,21 +164,11 @@ export default function EventsModule({
 
   const executeDelete = async () => {
     if (!confirmDeleteEvent) return;
-
     try {
-      const { error } = await supabase
-        .from('events')
-        .delete()
-        .eq('id', confirmDeleteEvent.id);
-
-      if (error) throw error;
-
-      toast.success('Evento eliminado correctamente');
+      await onDeleteEvent(confirmDeleteEvent.id);
       setConfirmDeleteEvent(null);
-      onRefresh();
     } catch (err: any) {
-      console.error('Error al eliminar evento:', err);
-      toast.error(`Error al eliminar: ${err.message}`);
+      toast.error(`Error al eliminar: ${err?.message || 'Fallo de conexión'}`);
     }
   };
 
@@ -199,120 +191,145 @@ export default function EventsModule({
             className="w-56"
           />
 
-          <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-2 rounded-xl">
-            Total: {filteredEvents.length} {filteredEvents.length === 1 ? 'evento' : 'eventos'}
-          </span>
+          <div className="text-xs font-semibold text-slate-500">
+            {filteredEvents.length} {filteredEvents.length === 1 ? 'evento encontrado' : 'eventos encontrados'}
+          </div>
         </div>
 
-        {canEdit && (
+        {canEdit ? (
           <Button
             onClick={openNewModal}
-            className="font-bold shadow-md bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 h-9 text-xs flex items-center gap-2"
+            className="font-bold shadow-md bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 h-10 flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
-            <span>Crear Evento</span>
+            <span>Publicar Nuevo Evento</span>
           </Button>
+        ) : (
+          <span className="px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">
+            Modo Solo Consulta
+          </span>
         )}
       </div>
 
-      {/* Events Grid View */}
+      {/* Grid of Events Cards */}
       {paginatedEvents.length === 0 ? (
-        <div className="bg-white border border-slate-200 p-12 text-center text-slate-500 text-xs rounded-2xl shadow-xs space-y-2">
-          <Calendar className="w-12 h-12 mx-auto stroke-1 text-slate-400" />
-          <p className="font-bold text-slate-700">No hay eventos registrados en esta sección.</p>
-          <p className="text-[11px] text-slate-400">Publica un nuevo evento para la comunidad del residencial.</p>
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-xs">
+          <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-slate-700">No hay eventos registrados</h3>
+          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+            {searchTerm || selectedCategory !== 'ALL'
+              ? 'No se encontraron eventos con los filtros actuales.'
+              : 'Aún no se han publicado actividades o eventos comunitarios en el residencial.'}
+          </p>
+          {canEdit && (
+            <Button
+              onClick={openNewModal}
+              variant="outline"
+              className="mt-4 rounded-full font-bold text-xs border-blue-200 text-blue-600 hover:bg-blue-50"
+            >
+              <Plus className="w-4 h-4 mr-1.5" /> Publicar el primer evento
+            </Button>
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {paginatedEvents.map((evt) => (
             <Card
               key={evt.id}
-              className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between"
+              className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition duration-200 flex flex-col justify-between"
             >
-              {/* Image banner */}
-              <div className="relative h-48 w-full bg-slate-100 overflow-hidden">
+              {/* Event Image Banner or Placeholder */}
+              <div className="relative h-44 w-full bg-slate-100 overflow-hidden group">
                 {evt.image ? (
                   <img
                     src={evt.image}
                     alt={evt.title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      e.currentTarget.src =
-                        'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=600&q=80';
-                    }}
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                   />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-linear-to-br from-blue-50 to-indigo-50">
-                    <PartyPopper className="w-10 h-10 text-blue-400 mb-1" />
-                    <span className="text-[11px] font-semibold">Sin imagen asignada</span>
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-300">
+                    <PartyPopper className="w-10 h-10 mb-1 opacity-70" />
+                    <span className="text-[11px] font-semibold text-slate-400">Sin afiche promocional</span>
                   </div>
                 )}
 
-                {/* Category badge */}
-                {evt.category && (
-                  <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/60 backdrop-blur-xs text-white text-[11px] font-bold shadow-md">
-                    {evt.category}
-                  </div>
-                )}
+                {/* Category Badge Floating */}
+                <div className="absolute top-3 left-3">
+                  <span className="px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md text-white text-[11px] font-bold shadow-xs">
+                    {evt.category || 'General'}
+                  </span>
+                </div>
               </div>
 
-              {/* Card Body */}
-              <CardContent className="p-4 space-y-3">
-                <h3 className="font-bold text-base text-slate-900 line-clamp-1">{evt.title}</h3>
+              <CardContent className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                <div className="space-y-2">
+                  <h3 className="font-extrabold text-base text-slate-900 line-clamp-2 leading-tight">
+                    {evt.title}
+                  </h3>
 
-                {evt.description ? (
-                  <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">{evt.description}</p>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">Sin descripción detallada</p>
-                )}
+                  {evt.description && (
+                    <p className="text-xs text-slate-600 line-clamp-3 leading-relaxed">
+                      {evt.description}
+                    </p>
+                  )}
+                </div>
 
-                <div className="space-y-1.5 pt-1 text-xs text-slate-600">
+                <div className="space-y-2 pt-3 border-t border-slate-100 text-xs text-slate-600">
                   {evt.event_date && (
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
-                      <span className="font-semibold text-slate-800 truncate">{evt.event_date}</span>
+                      <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="font-semibold text-slate-800">{evt.event_date}</span>
                     </div>
                   )}
 
                   {evt.location && (
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
+                      <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                       <span className="truncate">{evt.location}</span>
                     </div>
                   )}
 
                   {evt.whatsapp && (
                     <div className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <MessageSquare className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                       <a
                         href={`https://wa.me/${evt.whatsapp.replace(/\D/g, '')}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-emerald-700 hover:underline font-semibold"
+                        className="text-emerald-700 hover:underline font-mono"
                       >
-                        WhatsApp: {evt.whatsapp}
+                        {evt.whatsapp}
+                      </a>
+                    </div>
+                  )}
+
+                  {evt.organizer_phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <a href={`tel:${evt.organizer_phone}`} className="hover:underline font-mono">
+                        {evt.organizer_phone}
                       </a>
                     </div>
                   )}
                 </div>
               </CardContent>
 
-              {/* Card Footer Actions */}
               {canEdit && (
-                <CardFooter className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end space-x-2">
+                <CardFooter className="px-5 py-3.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-end gap-2">
                   <Button
                     onClick={() => openEditModal(evt)}
-                    className="px-3 h-8 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5"
                     variant="ghost"
+                    size="sm"
+                    className="h-8 px-3 rounded-lg text-slate-700 hover:bg-slate-200 font-semibold text-xs flex items-center gap-1.5"
                   >
-                    <Edit className="w-3.5 h-3.5" />
+                    <Edit className="w-3.5 h-3.5 text-slate-500" />
                     <span>Editar</span>
                   </Button>
                   <Button
                     onClick={() => setConfirmDeleteEvent(evt)}
-                    className="px-3 h-8 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg text-xs font-semibold flex items-center gap-1.5"
                     variant="ghost"
+                    size="sm"
+                    className="h-8 px-3 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 font-semibold text-xs flex items-center gap-1.5"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Eliminar</span>
@@ -324,26 +341,27 @@ export default function EventsModule({
         </div>
       )}
 
-      {/* Pagination */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-        <TablePagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={filteredEvents.length}
-          itemsPerPage={itemsPerPage}
-          onPageChange={setCurrentPage}
-          onItemsPerPageChange={setItemsPerPage}
-          pageSizeOptions={[6, 12, 24]}
-        />
-      </div>
+      {/* Pagination Controls */}
+      {filteredEvents.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs">
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredEvents.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setItemsPerPage}
+            pageSizeOptions={[6, 12, 24]}
+          />
+        </div>
+      )}
 
-      {/* Create / Edit Dialog Modal */}
+      {/* Modal Crear / Editar Evento */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              <span>{editingEvent ? 'Editar Evento Comunitario' : 'Crear Nuevo Evento'}</span>
+            <DialogTitle className="text-base font-bold text-slate-900">
+              {editingEvent ? 'Editar Evento Residencial' : 'Publicar Nuevo Evento'}
             </DialogTitle>
           </DialogHeader>
 
@@ -431,6 +449,7 @@ export default function EventsModule({
               <Button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
+                disabled={isSubmitting}
                 variant="secondary"
                 className="rounded-full font-semibold text-xs"
               >
@@ -439,9 +458,16 @@ export default function EventsModule({
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs"
+                className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs flex items-center gap-1.5"
               >
-                {isSubmitting ? 'Guardando...' : editingEvent ? 'Actualizar Evento' : 'Publicar Evento'}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Guardando...</span>
+                  </>
+                ) : (
+                  <span>{editingEvent ? 'Actualizar Evento' : 'Publicar Evento'}</span>
+                )}
               </Button>
             </DialogFooter>
           </form>
@@ -456,6 +482,16 @@ export default function EventsModule({
         title="¿Eliminar Evento?"
         description={`¿Estás seguro de que deseas eliminar permanentemente el evento "${confirmDeleteEvent?.title}"? Esta acción no se puede deshacer.`}
         confirmText="Sí, Eliminar Evento"
+      />
+
+      {/* Confirmation Dialog for Update */}
+      <ConfirmDialog
+        isOpen={Boolean(confirmUpdatePayload)}
+        onClose={() => setConfirmUpdatePayload(null)}
+        onConfirm={executeUpdate}
+        title="¿Actualizar Evento?"
+        description={`¿Deseas guardar los cambios realizados en el evento "${confirmUpdatePayload?.title}"?`}
+        confirmText="Sí, Actualizar"
       />
     </div>
   );

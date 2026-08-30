@@ -426,9 +426,14 @@ export default function AdminPage() {
           {activeTab === 'events' && (
             <EventsModule
               events={events}
-              onRefresh={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.events })}
+              onSaveEvent={async (event) => {
+                await saveEventMutation.mutateAsync(event);
+              }}
+              onDeleteEvent={async (id) => {
+                await deleteEventMutation.mutateAsync(id);
+              }}
               searchTerm={searchTerm}
-              canEdit={!permissions.isReadOnly}
+              canEdit={permissions.canEditEvents && !permissions.isReadOnly}
             />
           )}
 

@@ -7,6 +7,7 @@ export interface RolePermissions {
   canEditCategories: boolean;
   canEditMenuItems: boolean;
   canEditPromotions: boolean;
+  canEditEvents: boolean;
   canEditEmergencyContacts: boolean;
   canBulkImport: boolean;
   isReadOnly: boolean;
@@ -40,6 +41,7 @@ export function getRolePermissions(role: UserRole): RolePermissions {
         canEditCategories: true,
         canEditMenuItems: true,
         canEditPromotions: true,
+        canEditEvents: true,
         canEditEmergencyContacts: true,
         canBulkImport: true,
         isReadOnly: false,
@@ -52,6 +54,7 @@ export function getRolePermissions(role: UserRole): RolePermissions {
         canEditCategories: true,
         canEditMenuItems: true,
         canEditPromotions: true,
+        canEditEvents: true,
         canEditEmergencyContacts: true,
         canBulkImport: true,
         isReadOnly: false,
@@ -65,6 +68,7 @@ export function getRolePermissions(role: UserRole): RolePermissions {
         canEditCategories: false,
         canEditMenuItems: false,
         canEditPromotions: false,
+        canEditEvents: false,
         canEditEmergencyContacts: false,
         canBulkImport: false,
         isReadOnly: true,
