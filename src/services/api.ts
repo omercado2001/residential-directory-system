@@ -126,6 +126,7 @@ export async function fetchPromotionsApi(): Promise<Promotion[]> {
 }
 
 export async function savePromotionApi(promotion: Promotion): Promise<Promotion> {
+  const isNew = !promotion.id;
   const payload: any = {
     id: promotion.id || crypto.randomUUID(),
     business_id: promotion.business_id,
@@ -147,6 +148,13 @@ export async function savePromotionApi(promotion: Promotion): Promise<Promotion>
     .single();
 
   if (error) throw new Error(error.message);
+  if (isNew) {
+    broadcastPushToAllDevices(
+      '🔥 Nueva Promoción',
+      `${payload.title} - ¡Aprovecha ahora en la app!`,
+      { url: '/(tabs)/promociones' }
+    );
+  }
   return data;
 }
 
@@ -166,6 +174,7 @@ export async function fetchEventsApi(): Promise<CommunityEvent[]> {
 }
 
 export async function saveEventApi(event: CommunityEvent): Promise<CommunityEvent> {
+  const isNew = !event.id;
   const payload: any = {
     id: event.id || crypto.randomUUID(),
     title: event.title.trim(),
@@ -186,6 +195,13 @@ export async function saveEventApi(event: CommunityEvent): Promise<CommunityEven
     .single();
 
   if (error) throw new Error(error.message);
+  if (isNew) {
+    broadcastPushToAllDevices(
+      '📅 Nuevo Evento Programado',
+      `${payload.title} - ¡Revisa los detalles en la app!`,
+      { url: '/(tabs)/' }
+    );
+  }
   return data;
 }
 
@@ -318,5 +334,61 @@ export async function fetchAppAnalyticsApi(): Promise<AppAnalyticsEvent[]> {
     return data || [];
   } catch {
     return [];
+  }
+}
+
+
+// ==========================================
+// EXPO PUSH NOTIFICATIONS
+// ==========================================
+async function broadcastPushToAllDevices(title: string, body: string, dataPayload?: any) {
+  try {
+    const { data: tokenRecords, error } = await supabase.from('push_tokens').select('token');
+    if (error) {
+      console.error('Error fetching push tokens:', error);
+      return;
+    }
+    if (!tokenRecords || tokenRecords.length === 0) return;
+
+    const validTokens = tokenRecords
+      .map((r) => r.token)
+      .filter((t) => t && (t.startsWith('ExponentPushToken') || t.startsWith('ExpoPushToken')));
+
+    if (validTokens.length === 0) return;
+
+    const messages = validTokens.map((tokenStr) => ({
+      to: tokenStr,
+      sound: 'default',
+      channelId: 'tuvecino_alertas_v2',
+      title,
+      body,
+      data: dataPayload || {},
+    }));
+
+    console.log(`🚀 Preparando envío masivo a ${messages.length} dispositivo(s) en lotes de 10...`);
+    const BATCH_SIZE = 10;
+    const chunks = [];
+    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+      chunks.push(messages.slice(i, i + BATCH_SIZE));
+    }
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      try {
+        await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Accept-encoding': 'gzip, deflate',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(chunk),
+        });
+      } catch (batchErr) {
+        console.error(`❌ Error al enviar lote ${i + 1}:`, batchErr);
+      }
+    }
+  } catch (err) {
+    console.error('Error en broadcastPushToAllDevices:', err);
   }
 }
