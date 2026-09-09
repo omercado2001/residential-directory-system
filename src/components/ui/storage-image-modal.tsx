@@ -30,6 +30,7 @@ interface StorageImageFile {
   size?: number;
   businessId?: string | null;
   businessName?: string | null;
+  isInUse?: boolean;
 }
 
 interface BusinessFolderInfo {
@@ -80,6 +81,29 @@ export function StorageImageModal({
       setBusinessesList(bizList);
       const bizMap = new Map<string, string>(bizList.map((b) => [b.id, b.name]));
 
+      // 1.5 Fetch globally used URLs to filter them out
+      const globalUsedUrls = new Set<string>();
+      const [{ data: allBiz }, { data: allItems }, { data: allPromos }] = await Promise.all([
+        supabase.from('businesses').select('image, logo, gallery'),
+        supabase.from('menu_items').select('image'),
+        supabase.from('promotions').select('image'),
+      ]);
+      
+      const addUsed = (url: string | null | undefined) => {
+        if (!url) return;
+        globalUsedUrls.add(url.split('?')[0]);
+      };
+
+      allBiz?.forEach((b: any) => {
+        addUsed(b.image);
+        addUsed(b.logo);
+        if (b.gallery && Array.isArray(b.gallery)) {
+          b.gallery.forEach(addUsed);
+        }
+      });
+      allItems?.forEach((i: any) => addUsed(i.image));
+      allPromos?.forEach((p: any) => addUsed(p.image));
+
       // 2. Discover business folders in Storage
       const { data: baseItems } = await supabase.storage.from(BUCKET_NAME).list('businesses', {
         limit: 100,
@@ -99,51 +123,71 @@ export function StorageImageModal({
           const { data: urlData } = supabase.storage
             .from(BUCKET_NAME)
             .getPublicUrl(`businesses/${item.name}`);
+          
+          const pUrl = urlData?.publicUrl || '';
+          
           rootFiles.push({
             name: item.name,
             id: item.id,
-            publicUrl: urlData?.publicUrl || '',
+            publicUrl: pUrl,
             folder: 'businesses',
             size: item.metadata?.size,
+            isInUse: globalUsedUrls.has(pUrl.split('?')[0]),
           });
         }
       });
 
-      // Query each discovered business subfolder in parallel
+      // Query each discovered business subfolder and its nested subfolders (icono, portada, galeria) in parallel
       const subfolderResults = await Promise.all(
         discoveredFolders.map(async (folderId) => {
           try {
-            const folderPath = `businesses/${folderId}`;
-            const { data: files } = await supabase.storage
-              .from(BUCKET_NAME)
-              .list(folderPath, {
-                limit: 100,
-                sortBy: { column: 'name', order: 'asc' },
-              });
+            const rootPath = `businesses/${folderId}`;
+            const subPaths = [rootPath, `${rootPath}/icono`, `${rootPath}/portada`, `${rootPath}/galeria`];
 
-            const validImages: StorageImageFile[] = [];
-            (files || []).forEach((f) => {
-              if (f.name === '.emptyFolderPlaceholder') return;
-              if (f.name.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i)) {
-                const { data: urlData } = supabase.storage
-                  .from(BUCKET_NAME)
-                  .getPublicUrl(`${folderPath}/${f.name}`);
-
-                validImages.push({
-                  name: f.name,
-                  id: f.id,
-                  publicUrl: urlData?.publicUrl || '',
-                  folder: folderPath,
-                  size: f.metadata?.size,
-                  businessId: folderId,
-                  businessName: bizMap.get(folderId) || `Comercio ${folderId.slice(0, 8)}`,
+            const listPromises = subPaths.map(async (fPath) => {
+              try {
+                const { data: files } = await supabase.storage.from(BUCKET_NAME).list(fPath, {
+                  limit: 100,
+                  sortBy: { column: 'name', order: 'asc' },
                 });
+                return { fPath, files: files || [] };
+              } catch {
+                return { fPath, files: [] };
               }
+            });
+
+            const allSubResults = await Promise.all(listPromises);
+            const validImages: StorageImageFile[] = [];
+
+            allSubResults.forEach(({ fPath, files }) => {
+              files.forEach((f) => {
+                if (f.name === '.emptyFolderPlaceholder') return;
+                const isFolder = !f.id && !f.metadata;
+                if (isFolder) return;
+                if (f.name.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i)) {
+                  const { data: urlData } = supabase.storage
+                    .from(BUCKET_NAME)
+                    .getPublicUrl(`${fPath}/${f.name}`);
+                  
+                  const pUrl = urlData?.publicUrl || '';
+
+                  validImages.push({
+                    name: f.name,
+                    id: f.id,
+                    publicUrl: pUrl,
+                    folder: fPath,
+                    size: f.metadata?.size,
+                    businessId: folderId,
+                    businessName: bizMap.get(folderId) || `Comercio ${folderId.slice(0, 8)}`,
+                    isInUse: globalUsedUrls.has(pUrl.split('?')[0]),
+                  });
+                }
+              });
             });
 
             return {
               folderId,
-              folderPath,
+              folderPath: rootPath,
               images: validImages,
             };
           } catch {
@@ -212,6 +256,7 @@ export function StorageImageModal({
               folder: `businesses/${businessId}`,
               businessId,
               businessName: businessName || bizMap.get(businessId) || 'Comercio',
+              isInUse: true,
             });
           }
         });
@@ -404,23 +449,25 @@ export function StorageImageModal({
           )}
 
           {/* Live Search */}
-          <div className="relative ml-auto">
-            <Input
-              placeholder={activeTab === 'by-business' && !selectedFolderBiz ? 'Buscar carpeta de comercio...' : 'Buscar foto por nombre o comercio...'}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="h-9 text-xs w-64 md:w-80 pl-9 rounded-xl bg-slate-50 border-slate-200 focus:bg-white transition"
-            />
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
+          <div className="relative ml-auto flex items-center gap-3">
+            <div className="relative">
+              <Input
+                placeholder={activeTab === 'by-business' && !selectedFolderBiz ? 'Buscar carpeta de comercio...' : 'Buscar foto por nombre o comercio...'}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-9 text-xs w-52 md:w-72 pl-9 rounded-xl bg-slate-50 border-slate-200 focus:bg-white transition"
+              />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -513,6 +560,11 @@ export function StorageImageModal({
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                           loading="lazy"
                         />
+                        {file.isInUse && (
+                          <div className="absolute top-2 left-2 bg-amber-500/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm z-10 backdrop-blur-sm">
+                            En uso
+                          </div>
+                        )}
                       </div>
 
                       {/* File details & business badge */}

@@ -66,6 +66,7 @@ export default function StorageModule({
 
   // Direct Upload State: Always targets 'businesses'
   const [uploadBusinessId, setUploadBusinessId] = useState<string>('');
+  const [uploadSubfolder, setUploadSubfolder] = useState<'portada' | 'icono' | 'galeria'>('portada');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -103,8 +104,8 @@ export default function StorageModule({
 
     // Businesses
     businesses.forEach((b) => {
-      if (b.image) recordUsage(b.image, `Comercio: ${b.name} (Foto principal)`, b.id, b.name);
-      if (b.logo) recordUsage(b.logo, `Comercio: ${b.name} (Logo)`, b.id, b.name);
+      if (b.image) recordUsage(b.image, `Comercio: ${b.name} (Portada)`, b.id, b.name);
+      if (b.logo) recordUsage(b.logo, `Comercio: ${b.name} (Ícono)`, b.id, b.name);
       if (b.gallery && Array.isArray(b.gallery)) {
         b.gallery.forEach((img) => recordUsage(img, `Comercio: ${b.name} (Galería)`, b.id, b.name));
       }
@@ -137,7 +138,7 @@ export default function StorageModule({
     return usageMap;
   }, [businesses, menuItems, promotions, events, profiles]);
 
-  // 2. Fetch files in fast parallel queries
+  // 2. Fetch files in fast parallel queries including nested subfolders (icono, portada, galeria)
   const loadStorageFiles = useCallback(async () => {
     setIsLoading(true);
     const usageMap = buildUsageMap();
@@ -163,13 +164,13 @@ export default function StorageModule({
         })
       );
 
-      // Collect any subdirectories (e.g. businesses/{id})
-      const subfolderRequests: { parentFolder: string; subfolderName: string }[] = [];
+      // Collect Level 1 subdirectories (e.g. businesses/{id})
+      const level1Requests: { parentFolder: string; subfolderName: string }[] = [];
       baseResults.forEach(({ folder, items }) => {
         items.forEach((item) => {
           const isFolder = !item.id && !item.metadata;
           if (isFolder && item.name !== '.emptyFolderPlaceholder') {
-            subfolderRequests.push({
+            level1Requests.push({
               parentFolder: folder ? `${folder}/${item.name}` : item.name,
               subfolderName: item.name,
             });
@@ -177,9 +178,9 @@ export default function StorageModule({
         });
       });
 
-      // Query discovered subfolders in parallel
-      const subfolderResults = await Promise.all(
-        subfolderRequests.map(async ({ parentFolder }) => {
+      // Query Level 1 subfolders in parallel
+      const level1Results = await Promise.all(
+        level1Requests.map(async ({ parentFolder }) => {
           try {
             const { data } = await supabase.storage
               .from(BUCKET_NAME)
@@ -195,7 +196,50 @@ export default function StorageModule({
         })
       );
 
-      const allResults = [...baseResults, ...subfolderResults];
+      // Collect Level 2 subdirectories (e.g. businesses/{id}/icono, portada, galeria)
+      const level2Requests: { parentFolder: string; subfolderName: string }[] = [];
+      level1Results.forEach(({ folder, items }) => {
+        items.forEach((item) => {
+          const isFolder = !item.id && !item.metadata;
+          if (isFolder && item.name !== '.emptyFolderPlaceholder') {
+            level2Requests.push({
+              parentFolder: `${folder}/${item.name}`,
+              subfolderName: item.name,
+            });
+          }
+        });
+      });
+
+      // Also ensure standard subfolders (icono, portada, galeria) are queried for discovered business folders
+      level1Requests.forEach(({ parentFolder }) => {
+        if (parentFolder.startsWith('businesses/')) {
+          ['icono', 'portada', 'galeria'].forEach((sub) => {
+            const path = `${parentFolder}/${sub}`;
+            if (!level2Requests.some((r) => r.parentFolder === path)) {
+              level2Requests.push({ parentFolder: path, subfolderName: sub });
+            }
+          });
+        }
+      });
+
+      const level2Results = await Promise.all(
+        level2Requests.map(async ({ parentFolder }) => {
+          try {
+            const { data } = await supabase.storage
+              .from(BUCKET_NAME)
+              .list(parentFolder, {
+                limit: 100,
+                offset: 0,
+                sortBy: { column: 'name', order: 'asc' },
+              });
+            return { folder: parentFolder, items: data || [] };
+          } catch {
+            return { folder: parentFolder, items: [] };
+          }
+        })
+      );
+
+      const allResults = [...baseResults, ...level1Results, ...level2Results];
       const allFetchedFiles: StorageFileDetail[] = [];
       const seenPaths = new Set<string>();
 
@@ -221,8 +265,9 @@ export default function StorageModule({
           let assocBizId: string | null = null;
           let assocBizName: string | null = null;
 
-          if (folder.includes('/')) {
-            const potentialBizId = folder.split('/')[1];
+          if (folder.startsWith('businesses/')) {
+            const parts = folder.split('/');
+            const potentialBizId = parts[1];
             const matchedBiz = businesses.find((b) => b.id === potentialBizId);
             if (matchedBiz) {
               assocBizId = matchedBiz.id;
@@ -395,9 +440,9 @@ export default function StorageModule({
       setUploadProgress({ current: i + 1, total: filesToUpload.length });
 
       try {
-        // Fixed folder: 'businesses' or 'businesses/{businessId}'
+        // Fixed folder: 'businesses' or 'businesses/{businessId}/{subfolder}'
         const filePath = uploadBusinessId && uploadBusinessId !== 'ALL'
-          ? `businesses/${uploadBusinessId}/${cleanName}`
+          ? `businesses/${uploadBusinessId}/${uploadSubfolder}/${cleanName}`
           : `businesses/${cleanName}`;
 
         const { error } = await supabase.storage
@@ -654,18 +699,58 @@ export default function StorageModule({
             </div>
 
             {/* Business Selector with Searchable Combobox */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-600 whitespace-nowrap">Vincular a:</span>
-              <SearchableSelect
-                options={businessOptions}
-                value={uploadBusinessId}
-                onChange={setUploadBusinessId}
-                allOptionLabel="(Comercio General)"
-                placeholder="Elegir comercio..."
-                searchPlaceholder="Escribe para buscar comercio..."
-                icon={Building2}
-                className="w-56"
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-600 whitespace-nowrap">Vincular a:</span>
+                <SearchableSelect
+                  options={businessOptions}
+                  value={uploadBusinessId}
+                  onChange={setUploadBusinessId}
+                  allOptionLabel="(Comercio General)"
+                  placeholder="Elegir comercio..."
+                  searchPlaceholder="Escribe para buscar comercio..."
+                  icon={Building2}
+                  className="w-56"
+                />
+              </div>
+
+              {uploadBusinessId && uploadBusinessId !== 'ALL' && (
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setUploadSubfolder('portada')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                      uploadSubfolder === 'portada'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Portada
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUploadSubfolder('icono')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                      uploadSubfolder === 'icono'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Ícono
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUploadSubfolder('galeria')}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                      uploadSubfolder === 'galeria'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Galería
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -714,7 +799,7 @@ export default function StorageModule({
                   </p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     {uploadBusinessId && uploadBusinessId !== 'ALL'
-                      ? `Se guardarán directamente asociadas a: ${businesses.find((b) => b.id === uploadBusinessId)?.name}`
+                      ? `Se guardarán en: businesses/${businesses.find((b) => b.id === uploadBusinessId)?.name}/${uploadSubfolder}/`
                       : 'Todas las imágenes se guardarán en la carpeta de comercios (PNG, JPG, JPEG, WEBP, GIF)'}
                   </p>
                 </div>
@@ -916,7 +1001,7 @@ export default function StorageModule({
                     {file.name}
                   </p>
 
-                  {/* Associated Business Tag */}
+                  {/* Associated Business Tag & Subfolder */}
                   {file.associatedBusinessName && (
                     <div className="flex items-center gap-1 text-[11px] text-blue-700 font-semibold truncate">
                       <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
@@ -925,6 +1010,25 @@ export default function StorageModule({
                       </span>
                     </div>
                   )}
+
+                  {/* Folder / Subfolder Tag */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {file.fullPath.includes('/icono') && (
+                      <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded font-bold">
+                        Ícono
+                      </span>
+                    )}
+                    {file.fullPath.includes('/portada') && (
+                      <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded font-bold">
+                        Portada
+                      </span>
+                    )}
+                    {file.fullPath.includes('/galeria') && (
+                      <span className="text-[10px] bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded font-bold">
+                        Galería
+                      </span>
+                    )}
+                  </div>
 
                   {file.size && (
                     <p className="text-[10px] text-slate-400 font-mono">

@@ -126,11 +126,23 @@ export async function fetchPromotionsApi(): Promise<Promotion[]> {
 }
 
 export async function savePromotionApi(promotion: Promotion): Promise<Promotion> {
-  const isNew = !promotion.id;
+  let finalCategoryId = promotion.category_id && promotion.category_id.trim() ? promotion.category_id.trim() : null;
+
+  if (!finalCategoryId && promotion.business_id) {
+    const { data: biz } = await supabase.from('businesses').select('category_id').eq('id', promotion.business_id).maybeSingle();
+    if (biz?.category_id) {
+      finalCategoryId = biz.category_id;
+    }
+  }
+
+  if (!finalCategoryId) {
+    finalCategoryId = 'comercio';
+  }
+
   const payload: any = {
     id: promotion.id || crypto.randomUUID(),
     business_id: promotion.business_id,
-    category_id: promotion.category_id || null,
+    category_id: finalCategoryId,
     title: promotion.title.trim(),
     description: promotion.description && promotion.description.trim() ? promotion.description.trim() : null,
     badge: promotion.badge && promotion.badge.trim() ? promotion.badge.trim() : null,
@@ -147,14 +159,17 @@ export async function savePromotionApi(promotion: Promotion): Promise<Promotion>
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
-  if (isNew) {
-    broadcastPushToAllDevices(
-      '🔥 Nueva Promoción',
-      `${payload.title} - ¡Aprovecha ahora en la app!`,
-      { url: '/(tabs)/promociones' }
-    );
+  if (error) {
+    console.error('Error in savePromotionApi:', error);
+    throw new Error(error.message || 'Error al guardar la oferta en la base de datos');
   }
+
+  broadcastPushToAllDevices(
+    '🔥 Nueva Promoción',
+    `${payload.title} - ¡Aprovecha ahora en la app!`,
+    { url: '/(tabs)/promociones' }
+  ).catch((e) => console.error('Push error:', e));
+
   return data;
 }
 
@@ -194,14 +209,17 @@ export async function saveEventApi(event: CommunityEvent): Promise<CommunityEven
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
-  if (isNew) {
-    broadcastPushToAllDevices(
-      '📅 Nuevo Evento Programado',
-      `${payload.title} - ¡Revisa los detalles en la app!`,
-      { url: '/(tabs)/' }
-    );
+  if (error) {
+    console.error('Error in saveEventApi:', error);
+    throw new Error(error.message || 'Error al guardar el evento');
   }
+
+  broadcastPushToAllDevices(
+    '📅 Nuevo Evento Programado',
+    `${payload.title} - ¡Revisa los detalles en la app!`,
+    { url: '/(tabs)/' }
+  ).catch((e) => console.error('Push error:', e));
+
   return data;
 }
 
@@ -240,13 +258,19 @@ export async function saveEmergencyContactApi(contact: EmergencyContact): Promis
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error('Error in saveEmergencyContactApi:', error);
+    throw new Error(error.message || 'Error al guardar el contacto de emergencia en la base de datos');
+  }
   return data;
 }
 
 export async function deleteEmergencyContactApi(id: string): Promise<void> {
   const { error } = await supabase.from('emergency_contacts').delete().eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) {
+    console.error('Error in deleteEmergencyContactApi:', error);
+    throw new Error(error.message || 'Error al eliminar el contacto de emergencia');
+  }
 }
 
 export async function fetchSystemUsersApi(): Promise<SystemUser[]> {

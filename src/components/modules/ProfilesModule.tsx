@@ -293,38 +293,48 @@ export default function ProfilesModule({
 
       {/* Dialog Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingUser ? 'Editar Usuario' : 'Registrar Nuevo Usuario'}</DialogTitle>
+        <DialogContent className="sm:max-w-lg rounded-[28px] p-5 sm:p-6 border border-slate-200 shadow-2xl bg-white gap-0">
+          <DialogHeader className="pb-3.5 mb-1 border-b border-slate-100 space-y-1 text-left">
+            <DialogTitle className="text-[18px] font-extrabold text-slate-900 tracking-tight">
+              {editingUser ? 'Editar Usuario' : 'Registrar Nuevo Usuario'}
+            </DialogTitle>
+            <p className="text-[13px] text-slate-500 font-normal">
+              {editingUser
+                ? 'Actualiza los datos de perfil, accesos y permisos del usuario.'
+                : 'Completa la información para dar de alta una nueva cuenta en el sistema.'}
+            </p>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+
+          <div className="space-y-3 py-2">
             <div className="space-y-1.5">
-              <label className="text-slate-700 text-xs font-semibold block">Nombre Completo</label>
+              <label className="text-slate-700 text-[13px] font-semibold block">Nombre Completo</label>
               <Input
                 placeholder="Ej. Oscar Mercado"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                className="h-11 px-3.5 rounded-[14px] bg-slate-50/70 border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all"
                 required
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-slate-700 text-xs font-semibold flex items-center gap-1">
-                  <AtSign className="w-3 h-3 text-slate-400" />
+                <label className="text-slate-700 text-[13px] font-semibold flex items-center gap-1">
+                  <AtSign className="w-3.5 h-3.5 text-slate-400" />
                   <span>Usuario de Acceso</span>
                 </label>
                 <Input
                   placeholder="ej. oscar_admin"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  className="h-11 px-3.5 rounded-[14px] bg-slate-50/70 border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-slate-700 text-xs font-semibold flex items-center gap-1">
-                  <Mail className="w-3 h-3 text-slate-400" />
+                <label className="text-slate-700 text-[13px] font-semibold flex items-center gap-1">
+                  <Mail className="w-3.5 h-3.5 text-slate-400" />
                   <span>Correo Electrónico</span>
                 </label>
                 <Input
@@ -332,17 +342,18 @@ export default function ProfilesModule({
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  className="h-11 px-3.5 rounded-[14px] bg-slate-50/70 border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-slate-700 text-xs font-semibold flex items-center justify-between">
+              <label className="text-slate-700 text-[13px] font-semibold flex items-center justify-between">
                 <span className="flex items-center gap-1">
-                  <Lock className="w-3 h-3 text-slate-400" />
+                  <Lock className="w-3.5 h-3.5 text-slate-400" />
                   <span>Contraseña de Acceso {editingUser && '(Opcional al editar)'}</span>
                 </span>
-                {editingUser && <span className="text-[10px] text-slate-400 font-normal">Dejar vacío para conservar actual</span>}
+                {editingUser && <span className="text-[11px] text-slate-400 font-normal">Conservar actual si está vacío</span>}
               </label>
               <div className="relative">
                 <Input
@@ -350,12 +361,12 @@ export default function ProfilesModule({
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pr-10"
+                  className="h-11 px-3.5 pr-10 rounded-[14px] bg-slate-50/70 border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -364,7 +375,7 @@ export default function ProfilesModule({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-slate-700 text-xs font-semibold block">Rol y Permisos</label>
+              <label className="text-slate-700 text-[13px] font-semibold block">Rol y Permisos</label>
               <SearchableSelect
                 options={ROLES.map((r) => ({
                   value: r.id,
@@ -386,17 +397,20 @@ export default function ProfilesModule({
               folder="avatars"
             />
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="pt-3.5 mt-2 border-t border-slate-100 flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5">
             <Button
+              type="button"
               onClick={() => setIsModalOpen(false)}
               variant="secondary"
-              className="rounded-full font-semibold text-xs cursor-pointer"
+              className="h-11 px-5 rounded-[16px] font-semibold text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 border-0 cursor-pointer transition-all"
             >
               Cancelar
             </Button>
             <Button
+              type="button"
               onClick={handleFormSubmit}
-              className="font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-full px-5 text-xs cursor-pointer"
+              className="h-11 px-6 rounded-[16px] font-bold text-[15px] bg-blue-600 hover:bg-blue-500 text-white shadow-sm cursor-pointer transition-all flex items-center justify-center gap-2"
             >
               {editingUser ? 'Actualizar Usuario' : 'Guardar Usuario'}
             </Button>

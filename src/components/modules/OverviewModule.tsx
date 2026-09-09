@@ -386,8 +386,8 @@ export default function OverviewModule({
             </div>
           </div>
 
-          {/* 4 Summary Stat Tiles */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Summary Stat Tiles */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50/50 border border-blue-200/80 space-y-1.5">
               <div className="text-[11px] font-bold text-blue-700 flex items-center justify-between">
                 <span>Total de Consultas</span>
@@ -426,19 +426,6 @@ export default function OverviewModule({
               </div>
               <p className="text-[11px] text-amber-700/90 font-semibold truncate" title={stats.peakDay ? formatDayName(stats.peakDay.date) : 'Sin datos'}>
                 {stats.peakDay ? formatDayName(stats.peakDay.date) : 'Sin actividad'}
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-pink-50/50 border border-purple-200/80 space-y-1.5">
-              <div className="text-[11px] font-bold text-purple-700 flex items-center justify-between">
-                <span>Interacciones Directas</span>
-                <Phone className="w-3.5 h-3.5 text-purple-600" />
-              </div>
-              <div className="text-3xl font-black text-purple-950 font-mono tracking-tight">
-                {(stats.whatsappClicks + stats.phoneClicks).toLocaleString()}
-              </div>
-              <p className="text-[11px] text-purple-700/90 font-medium">
-                {stats.whatsappClicks} WhatsApp + {stats.phoneClicks} Llamadas
               </p>
             </div>
           </div>
@@ -524,45 +511,6 @@ export default function OverviewModule({
                   <span className="font-bold text-slate-900 text-xs font-mono">{stats.businessViews}</span>
                 </div>
 
-                <div className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                      <Search className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-xs font-semibold text-slate-700">Búsquedas de Texto</span>
-                  </div>
-                  <span className="font-bold text-slate-900 text-xs font-mono">{stats.searches}</span>
-                </div>
-
-                <div className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
-                      <FolderTree className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-xs font-semibold text-slate-700">Vistas de Categorías</span>
-                  </div>
-                  <span className="font-bold text-slate-900 text-xs font-mono">{stats.categoryViews}</span>
-                </div>
-
-                <div className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                      <MessageSquare className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-xs font-semibold text-slate-700">Contactos WhatsApp</span>
-                  </div>
-                  <span className="font-bold text-slate-900 text-xs font-mono">{stats.whatsappClicks}</span>
-                </div>
-
-                <div className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
-                      <Phone className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-xs font-semibold text-slate-700">Llamadas Telefónicas</span>
-                  </div>
-                  <span className="font-bold text-slate-900 text-xs font-mono">{stats.phoneClicks}</span>
-                </div>
               </div>
             </div>
           </div>

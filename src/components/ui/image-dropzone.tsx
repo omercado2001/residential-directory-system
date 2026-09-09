@@ -13,10 +13,12 @@ interface ImageDropzoneProps {
   value?: string;
   onChange: (url: string) => void;
   folder?: string;
+  subfolder?: 'icono' | 'portada' | 'galeria' | string;
   className?: string;
   placeholder?: string;
   businessId?: string;
   businessName?: string;
+  allowMultiple?: boolean;
 }
 
 const STORAGE_BUCKET = 'residential-directory';
@@ -26,9 +28,11 @@ export function ImageDropzone({
   value,
   onChange,
   folder = 'uploads',
+  subfolder,
   className = '',
   businessId,
   businessName,
+  allowMultiple = false,
 }: ImageDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -56,10 +60,12 @@ export function ImageDropzone({
       const fileExt = file.name.split('.').pop()?.toLowerCase() || 'png';
       const cleanFileName = `${hashKey}.${fileExt}`;
       
-      const targetFolder = businessId ? `${folder}/${businessId}` : folder;
+      let targetFolder = folder;
+      if (businessId) {
+        targetFolder = subfolder ? `${folder}/${businessId}/${subfolder}` : `${folder}/${businessId}`;
+      }
       const filePath = `${targetFolder}/${cleanFileName}`;
 
-      // Check if this exact file already exists in the bucket
       const { data: existingList } = await supabase.storage
         .from(STORAGE_BUCKET)
         .list(targetFolder, { limit: 100, search: hashKey });
@@ -75,8 +81,6 @@ export function ImageDropzone({
         toast.info('Imagen existente detectada en el Storage: se reutilizó sin duplicar.');
         return;
       }
-
-      // If not existing, upload with deterministic hash name
       const { data, error } = await supabase.storage
         .from(STORAGE_BUCKET)
         .upload(filePath, file, {
@@ -96,6 +100,7 @@ export function ImageDropzone({
       const publicUrl = publicUrlData.publicUrl;
       onChange(publicUrl);
       toast.success('Imagen subida a Supabase Storage con éxito');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error('Error al subir imagen:', err);
       toast.error(`Error al subir imagen a Supabase: ${err?.message || 'Error de almacenamiento'}`);
@@ -119,13 +124,25 @@ export function ImageDropzone({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      await uploadFile(e.dataTransfer.files[0]);
+      if (allowMultiple) {
+        for (let i = 0; i < e.dataTransfer.files.length; i++) {
+          await uploadFile(e.dataTransfer.files[i]);
+        }
+      } else {
+        await uploadFile(e.dataTransfer.files[0]);
+      }
     }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      await uploadFile(e.target.files[0]);
+      if (allowMultiple) {
+        for (let i = 0; i < e.target.files.length; i++) {
+          await uploadFile(e.target.files[i]);
+        }
+      } else {
+        await uploadFile(e.target.files[0]);
+      }
     }
   };
 
@@ -143,16 +160,15 @@ export function ImageDropzone({
         </button>
       </div>
 
-      {/* Hidden file input */}
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
         accept="image/*"
+        multiple={allowMultiple}
         className="hidden"
       />
 
-      {/* If an image is already uploaded or provided */}
       {value ? (
         <div className="relative group rounded-xl border border-slate-200 bg-slate-50 p-2 overflow-hidden flex items-center gap-3">
           <div className="w-16 h-16 rounded-lg bg-slate-200 overflow-hidden shrink-0 border border-slate-300 relative">
@@ -213,7 +229,6 @@ export function ImageDropzone({
           </div>
         </div>
       ) : (
-        /* Dropzone area */
         <div className="space-y-2">
           <div
             onDragOver={handleDragOver}
@@ -238,10 +253,10 @@ export function ImageDropzone({
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-xs font-bold text-slate-800">
-                    Arrastra o haz clic para subir imagen
+                    {allowMultiple ? 'Arrastra o haz clic para subir imagen(es)' : 'Arrastra o haz clic para subir imagen'}
                   </p>
                   <p className="text-[10px] text-slate-500">
-                    PNG, JPG o WEBP a Supabase Storage
+                    {allowMultiple ? 'Puedes seleccionar múltiples archivos (PNG, JPG, WEBP)' : 'PNG, JPG o WEBP a Supabase Storage'}
                   </p>
                 </div>
               </div>
@@ -267,7 +282,6 @@ export function ImageDropzone({
         </div>
       )}
 
-      {/* Storage Image Selection Modal */}
       <StorageImageModal
         isOpen={isGalleryOpen}
         onClose={() => setIsGalleryOpen(false)}

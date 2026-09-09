@@ -13,10 +13,12 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Category } from '@/types/database';
+import { Category, Business } from '@/types/database';
+import { toast } from 'sonner';
 
 interface CategoriesModuleProps {
   categories: Category[];
+  businesses: Business[];
   onSaveCategory: (category: Category) => Promise<void>;
   onDeleteCategory: (id: string) => Promise<void>;
   searchTerm: string;
@@ -57,6 +59,7 @@ export function renderCategoryIcon(iconName?: string, className = 'w-4 h-4') {
 
 export default function CategoriesModule({
   categories,
+  businesses,
   onSaveCategory,
   onDeleteCategory,
   searchTerm,
@@ -152,6 +155,15 @@ export default function CategoriesModule({
     setConfirmDeleteCat(null);
   };
 
+  const handleDeleteClick = (cat: Category) => {
+    const linkedBusinesses = businesses.filter(b => b.category_id === cat.id);
+    if (linkedBusinesses.length > 0) {
+      toast.error(`No se puede eliminar "${cat.name}" porque tiene ${linkedBusinesses.length} comercio(s) vinculado(s).`);
+      return;
+    }
+    setConfirmDeleteCat(cat);
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn text-slate-900">
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -209,7 +221,7 @@ export default function CategoriesModule({
                           <Button className="w-8 h-8 p-0 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200" variant="ghost" onClick={() => openEditModal(cat)}>
                             <Edit className="w-3.5 h-3.5" />
                           </Button>
-                          <Button className="w-8 h-8 p-0 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100" variant="ghost" onClick={() => setConfirmDeleteCat(cat)}>
+                          <Button className="w-8 h-8 p-0 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100" variant="ghost" onClick={() => handleDeleteClick(cat)}>
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>

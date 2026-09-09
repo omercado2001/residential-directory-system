@@ -377,6 +377,7 @@ export default function AdminPage() {
           {activeTab === 'categories' && (
             <CategoriesModule
               categories={categories}
+              businesses={businesses}
               onSaveCategory={(cat) => saveCategoryMutation.mutateAsync(cat).then(() => {})}
               onDeleteCategory={(id) => deleteCategoryMutation.mutateAsync(id).then(() => {})}
               searchTerm={searchTerm}
@@ -388,6 +389,7 @@ export default function AdminPage() {
             <BusinessesModule
               businesses={businesses}
               categories={categories}
+              menuItems={menuItems}
               onSaveBusiness={(biz) => saveBusinessMutation.mutateAsync(biz).then(() => {})}
               onBatchSaveBusinesses={(batch) => batchSaveBusinessesMutation.mutateAsync(batch).then(() => {})}
               onDeleteBusiness={(id) => deleteBusinessMutation.mutateAsync(id).then(() => {})}
@@ -457,6 +459,7 @@ export default function AdminPage() {
               menuItems={menuItems}
               promotions={promotions}
               events={events}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               profiles={systemUsers as any}
               categories={categories}
               searchTerm={searchTerm}

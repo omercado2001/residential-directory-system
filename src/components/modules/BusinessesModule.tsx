@@ -13,13 +13,14 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { BusinessBulkImportDrawer } from './BusinessBulkImportDrawer';
 import { renderCategoryIcon } from './CategoriesModule';
 import { SearchableSelect, SelectOption } from '@/components/ui/searchable-select';
-import { Business, Category } from '@/types/database';
+import { Business, Category, MenuItem } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 interface BusinessesModuleProps {
   businesses: Business[];
   categories: Category[];
+  menuItems: MenuItem[];
   onSaveBusiness: (business: Business) => Promise<void>;
   onBatchSaveBusinesses?: (businesses: Business[]) => Promise<void>;
   onDeleteBusiness: (id: string) => Promise<void>;
@@ -30,6 +31,7 @@ interface BusinessesModuleProps {
 export default function BusinessesModule({
   businesses,
   categories,
+  menuItems,
   onSaveBusiness,
   onBatchSaveBusinesses,
   onDeleteBusiness,
@@ -65,7 +67,7 @@ export default function BusinessesModule({
   const [description, setDescription] = useState('');
   const [image, setImage] = useState('');
   const [logo, setLogo] = useState('');
-  const [gallery, setGallery] = useState('');
+  const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [featured, setFeatured] = useState(false);
   const [lat, setLat] = useState<number | ''>(12.1364);
   const [lng, setLng] = useState<number | ''>(-86.2514);
@@ -97,7 +99,7 @@ export default function BusinessesModule({
     setName(''); setCategoryId(categories[0]?.id || ''); setTags('');
     setRating(5.0); setReviews(0); setDistance(0.5); setHours('Lunes a Sábado de 08:00am a 05:30pm');
     setIsOpenState(true); setPhone(''); setWhatsapp('');
-    setAddress(''); setDescription(''); setImage(''); setLogo(''); setGallery(''); setFeatured(false);
+    setAddress(''); setDescription(''); setImage(''); setLogo(''); setGalleryUrls([]); setFeatured(false);
     setLat(12.1364); setLng(-86.2514);
     setIsModalOpen(true);
   };
@@ -109,7 +111,8 @@ export default function BusinessesModule({
     setHours(b.hours || ''); setIsOpenState(b.is_open ?? true); setPhone(b.phone || '');
     setWhatsapp(b.whatsapp || ''); setAddress(b.address || ''); setDescription(b.description || '');
     setImage(b.image || ''); setLogo(b.logo || '');
-    setGallery(b.gallery ? b.gallery.join(', ') : ''); setFeatured(b.featured ?? false);
+    setGalleryUrls(b.gallery && Array.isArray(b.gallery) ? b.gallery : []);
+    setFeatured(b.featured ?? false);
     setLat(b.lat ?? 12.1364); setLng(b.lng ?? -86.2514);
     setIsModalOpen(true);
   };
@@ -132,7 +135,6 @@ export default function BusinessesModule({
       return;
     }
 
-    const galleryArray = gallery ? gallery.split(',').map((item) => item.trim()).filter(Boolean) : [];
     const payload: Business = {
       id: id || crypto.randomUUID(),
       name: name.trim(),
@@ -149,7 +151,7 @@ export default function BusinessesModule({
       description,
       image,
       logo,
-      gallery: galleryArray,
+      gallery: galleryUrls,
       featured,
       lat: lat !== '' && !isNaN(Number(lat)) ? Number(lat) : 12.1364,
       lng: lng !== '' && !isNaN(Number(lng)) ? Number(lng) : -86.2514,
@@ -160,9 +162,11 @@ export default function BusinessesModule({
       setConfirmUpdatePayload(payload);
     } else {
       try {
-        await supabase.storage
-          .from('residential-directory')
-          .upload(`businesses/${payload.id}/.emptyFolderPlaceholder`, new Blob(['']), { upsert: true });
+        await Promise.all([
+          supabase.storage.from('residential-directory').upload(`businesses/${payload.id}/icono/.emptyFolderPlaceholder`, new Blob(['']), { upsert: true }),
+          supabase.storage.from('residential-directory').upload(`businesses/${payload.id}/portada/.emptyFolderPlaceholder`, new Blob(['']), { upsert: true }),
+          supabase.storage.from('residential-directory').upload(`businesses/${payload.id}/galeria/.emptyFolderPlaceholder`, new Blob(['']), { upsert: true }),
+        ]);
       } catch {}
       await onSaveBusiness(payload);
       setIsModalOpen(false);
@@ -180,6 +184,15 @@ export default function BusinessesModule({
     if (!confirmDeleteBiz) return;
     await onDeleteBusiness(confirmDeleteBiz.id);
     setConfirmDeleteBiz(null);
+  };
+
+  const handleDeleteClick = (biz: Business) => {
+    const linkedProducts = menuItems.filter(m => m.business_id === biz.id);
+    if (linkedProducts.length > 0) {
+      toast.error(`No se puede eliminar "${biz.name}" porque tiene ${linkedProducts.length} producto(s) vinculado(s). Elimine los productos primero.`);
+      return;
+    }
+    setConfirmDeleteBiz(biz);
   };
 
   const handleBatchImport = async (batch: Business[]) => {
@@ -354,7 +367,7 @@ export default function BusinessesModule({
                       <Button onClick={() => openEditModal(b)} className="px-3 h-8 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5" variant="ghost">
                         <Edit className="w-3.5 h-3.5" /><span>Editar</span>
                       </Button>
-                      <Button onClick={() => setConfirmDeleteBiz(b)} className="w-8 h-8 p-0 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg" variant="ghost">
+                      <Button onClick={() => handleDeleteClick(b)} className="w-8 h-8 p-0 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg" variant="ghost">
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -472,20 +485,67 @@ export default function BusinessesModule({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <ImageDropzone
-                label="Foto Principal del Comercio"
+                label="Foto de Portada del Comercio (Carpeta: portada)"
                 value={image}
                 onChange={setImage}
                 folder="businesses"
+                subfolder="portada"
                 businessId={editingBusiness?.id || id}
                 businessName={name || 'Comercio'}
               />
               <ImageDropzone
-                label="Logo del Comercio"
+                label="Logo / Ícono del Comercio (Carpeta: icono)"
                 value={logo}
                 onChange={setLogo}
                 folder="businesses"
+                subfolder="icono"
                 businessId={editingBusiness?.id || id}
                 businessName={name || 'Comercio'}
+              />
+            </div>
+
+            {/* Galería de Fotos (Carpeta: galeria) */}
+            <div className="space-y-2 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="flex items-center justify-between">
+                <label className="text-slate-800 text-xs font-bold block">
+                  Galería de Fotos del Comercio (Carpeta: galeria)
+                </label>
+                <span className="text-[11px] font-semibold text-slate-500">
+                  {galleryUrls.length} {galleryUrls.length === 1 ? 'foto agregada' : 'fotos agregadas'}
+                </span>
+              </div>
+
+              {galleryUrls.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-2">
+                  {galleryUrls.map((url, idx) => (
+                    <div key={idx} className="relative group aspect-video rounded-lg overflow-hidden border border-slate-200 bg-white">
+                      <img src={url} alt={`Galería ${idx + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setGalleryUrls((prev) => prev.filter((_, i) => i !== idx))}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center opacity-90 group-hover:opacity-100 transition shadow-xs hover:bg-rose-700 text-[10px]"
+                        title="Quitar foto de la galería"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <ImageDropzone
+                label="Subir foto a la Galería"
+                value=""
+                onChange={(newUrl) => {
+                  if (newUrl && !galleryUrls.includes(newUrl)) {
+                    setGalleryUrls((prev) => [...prev, newUrl]);
+                  }
+                }}
+                folder="businesses"
+                subfolder="galeria"
+                businessId={editingBusiness?.id || id}
+                businessName={name || 'Comercio'}
+                allowMultiple={true}
               />
             </div>
 

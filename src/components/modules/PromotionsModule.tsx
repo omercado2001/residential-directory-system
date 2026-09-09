@@ -120,7 +120,7 @@ export default function PromotionsModule({
     }
 
     const selectedBiz = businesses.find((b) => b.id === finalBizId);
-    const finalCatId = categoryId || selectedBiz?.category_id || categories[0]?.id || '';
+    const finalCatId = categoryId || selectedBiz?.category_id || categories[0]?.id || 'comercio';
 
     const formattedDate = validUntil && validUntil.trim() ? validUntil.trim().split('T')[0] : null;
 
@@ -146,6 +146,7 @@ export default function PromotionsModule({
         await onSavePromotion(payload);
         setIsModalOpen(false);
       } catch (err: any) {
+        console.error('Error onSavePromotion:', err);
         toast.error(`Error al guardar: ${err?.message || 'Fallo de conexión'}`);
       } finally {
         setIsSubmitting(false);
@@ -161,6 +162,7 @@ export default function PromotionsModule({
       setConfirmUpdatePayload(null);
       setIsModalOpen(false);
     } catch (err: any) {
+      console.error('Error executeUpdate:', err);
       toast.error(`Error al actualizar: ${err?.message || 'Fallo de conexión'}`);
     } finally {
       setIsSubmitting(false);

@@ -3,10 +3,9 @@
 import React, { useState } from 'react';
 import {
   Calendar, MapPin, Phone, MessageSquare, Plus, Edit, Trash2,
-  Search, Filter, Sparkles, Clock, PartyPopper, Users, Tag, Image as ImageIcon,
-  Loader2
+  Filter, Clock, PartyPopper, Loader2
 } from 'lucide-react';
-import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -140,6 +139,7 @@ export default function EventsModule({
       try {
         await onSaveEvent(payload);
         setIsModalOpen(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         toast.error(`Error al publicar evento: ${err?.message || 'Fallo de conexión'}`);
       } finally {
@@ -155,6 +155,7 @@ export default function EventsModule({
       await onSaveEvent(confirmUpdatePayload);
       setConfirmUpdatePayload(null);
       setIsModalOpen(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast.error(`Error al actualizar evento: ${err?.message || 'Fallo de conexión'}`);
     } finally {
@@ -167,6 +168,7 @@ export default function EventsModule({
     try {
       await onDeleteEvent(confirmDeleteEvent.id);
       setConfirmDeleteEvent(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast.error(`Error al eliminar: ${err?.message || 'Fallo de conexión'}`);
     }
