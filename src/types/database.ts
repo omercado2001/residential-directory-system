@@ -65,6 +65,35 @@ export interface CommunityEvent {
   organizer_phone?: string | null;
   whatsapp?: string | null;
   image?: string | null;
+  status?: string | null;
+  created_at?: string;
+}
+
+export interface LostPetRequest {
+  id: string;
+  name: string;
+  type?: string | null;
+  sector?: string | null;
+  description?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  image?: string | null;
+  status?: string | null;
+  approval_status?: string | null;
+  created_at?: string;
+}
+
+export interface LostItemRequest {
+  id: string;
+  title: string;
+  category?: string | null;
+  sector?: string | null;
+  description?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  image?: string | null;
+  status?: string | null;
+  approval_status?: string | null;
   created_at?: string;
 }
 

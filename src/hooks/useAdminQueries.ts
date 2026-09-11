@@ -6,6 +6,8 @@ import {
   MenuItem,
   Promotion,
   CommunityEvent,
+  LostPetRequest,
+  LostItemRequest,
   EmergencyContact,
   SystemUser,
   AppLog,
@@ -27,7 +29,14 @@ import {
   deletePromotionApi,
   fetchEventsApi,
   saveEventApi,
+  approveEventApi,
   deleteEventApi,
+  fetchPendingPetsApi,
+  approvePetApi,
+  rejectPetApi,
+  fetchPendingItemsApi,
+  approveItemApi,
+  rejectItemApi,
   fetchEmergencyContactsApi,
   saveEmergencyContactApi,
   deleteEmergencyContactApi,
@@ -47,6 +56,8 @@ export const QUERY_KEYS = {
   menuItems: ['menu_items'] as const,
   promotions: ['promotions'] as const,
   events: ['events'] as const,
+  pendingPets: ['pending_pets'] as const,
+  pendingItems: ['pending_items'] as const,
   emergencyContacts: ['emergency_contacts'] as const,
   systemUsers: ['system_users'] as const,
   logs: ['app_logs'] as const,
@@ -238,6 +249,90 @@ export function useDeleteEventMutation() {
     },
     onError: (err: any) => {
       toast.error(`Error al eliminar evento: ${err?.message || 'Fallo inesperado'}`);
+    },
+  });
+}
+
+export function useApproveEventMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (event: CommunityEvent) => approveEventApi(event),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.events });
+      toast.success('¡Evento aprobado y notificado a la comunidad!');
+    },
+    onError: (err: any) => {
+      toast.error(`Error al aprobar evento: ${err?.message || 'Fallo inesperado'}`);
+    },
+  });
+}
+
+export function usePendingPetsQuery() {
+  return useQuery<LostPetRequest[]>({
+    queryKey: QUERY_KEYS.pendingPets,
+    queryFn: fetchPendingPetsApi,
+  });
+}
+
+export function useApprovePetMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (pet: LostPetRequest) => approvePetApi(pet),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingPets });
+      toast.success('¡Reporte de mascota aprobado y notificado a los vecinos!');
+    },
+    onError: (err: any) => {
+      toast.error(`Error al aprobar mascota: ${err?.message || 'Fallo inesperado'}`);
+    },
+  });
+}
+
+export function useRejectPetMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => rejectPetApi(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingPets });
+      toast.success('Solicitud de mascota rechazada y eliminada');
+    },
+    onError: (err: any) => {
+      toast.error(`Error al rechazar mascota: ${err?.message || 'Fallo inesperado'}`);
+    },
+  });
+}
+
+export function usePendingItemsQuery() {
+  return useQuery<LostItemRequest[]>({
+    queryKey: QUERY_KEYS.pendingItems,
+    queryFn: fetchPendingItemsApi,
+  });
+}
+
+export function useApproveItemMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (item: LostItemRequest) => approveItemApi(item),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingItems });
+      toast.success('¡Reporte de objeto aprobado y notificado a los vecinos!');
+    },
+    onError: (err: any) => {
+      toast.error(`Error al aprobar objeto: ${err?.message || 'Fallo inesperado'}`);
+    },
+  });
+}
+
+export function useRejectItemMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => rejectItemApi(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.pendingItems });
+      toast.success('Solicitud de objeto rechazada y eliminada');
+    },
+    onError: (err: any) => {
+      toast.error(`Error al rechazar objeto: ${err?.message || 'Fallo inesperado'}`);
     },
   });
 }

@@ -5,6 +5,8 @@ import {
   MenuItem,
   Promotion,
   CommunityEvent,
+  LostPetRequest,
+  LostItemRequest,
   EmergencyContact,
   SystemUser,
   AppLog,
@@ -200,6 +202,7 @@ export async function saveEventApi(event: CommunityEvent): Promise<CommunityEven
     organizer_phone: event.organizer_phone && event.organizer_phone.trim() ? event.organizer_phone.trim() : null,
     whatsapp: event.whatsapp && event.whatsapp.trim() ? event.whatsapp.trim().replace(/\D/g, '') : null,
     image: event.image && event.image.trim() ? event.image.trim() : null,
+    status: event.status || 'APROBADO',
     created_at: event.created_at || new Date().toISOString(),
   };
 
@@ -214,17 +217,102 @@ export async function saveEventApi(event: CommunityEvent): Promise<CommunityEven
     throw new Error(error.message || 'Error al guardar el evento');
   }
 
-  broadcastPushToAllDevices(
-    '📅 Nuevo Evento Programado',
-    `${payload.title} - ¡Revisa los detalles en la app!`,
-    { url: '/(tabs)/' }
-  ).catch((e) => console.error('Push error:', e));
+  if (payload.status === 'APROBADO' && isNew) {
+    broadcastPushToAllDevices(
+      '📅 Nuevo Evento Programado',
+      `${payload.title} - ¡Revisa los detalles en la app!`,
+      { url: '/(tabs)/' }
+    ).catch((e) => console.error('Push error:', e));
+  }
 
   return data;
 }
 
+export async function approveEventApi(event: CommunityEvent): Promise<void> {
+  const { error } = await supabase
+    .from('events')
+    .update({ status: 'APROBADO' })
+    .eq('id', event.id);
+
+  if (error) throw new Error(error.message);
+
+  await broadcastPushToAllDevices(
+    '🎉 ¡Nuevo Evento en Residencial City!',
+    `"${event.title}" (${event.category || 'Evento'}) este ${event.event_date || 'próximamente'} en ${event.location || 'el residencial'}.`,
+    { type: 'event', id: event.id }
+  );
+}
+
 export async function deleteEventApi(id: string): Promise<void> {
   const { error } = await supabase.from('events').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchPendingPetsApi(): Promise<LostPetRequest[]> {
+  const { data, error } = await supabase
+    .from('lost_pets')
+    .select('*')
+    .eq('status', 'SOLICITUD')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching pending pets:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function approvePetApi(pet: LostPetRequest): Promise<void> {
+  const { error } = await supabase
+    .from('lost_pets')
+    .update({ status: 'APROBADO' })
+    .eq('id', pet.id);
+
+  if (error) throw new Error(error.message);
+
+  await broadcastPushToAllDevices(
+    '🚨 ¡Mascota Perdida en Residencial City!',
+    `Se busca a ${pet.name} (${pet.type || 'Mascota'}) en ${pet.sector || 'el residencial'}. Contacto: ${pet.phone || 'Ver app'}`,
+    { type: 'lost_pet', id: pet.id }
+  );
+}
+
+export async function rejectPetApi(id: string): Promise<void> {
+  const { error } = await supabase.from('lost_pets').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchPendingItemsApi(): Promise<LostItemRequest[]> {
+  const { data, error } = await supabase
+    .from('lost_items')
+    .select('*')
+    .eq('status', 'SOLICITUD')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching pending items:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function approveItemApi(item: LostItemRequest): Promise<void> {
+  const { error } = await supabase
+    .from('lost_items')
+    .update({ status: 'APROBADO' })
+    .eq('id', item.id);
+
+  if (error) throw new Error(error.message);
+
+  await broadcastPushToAllDevices(
+    '🔍 ¡Objeto Reportado en Residencial City!',
+    `"${item.title}" (${item.category || 'Objeto'}) en ${item.sector || 'el residencial'}. Contacto: ${item.phone || 'Ver app'}`,
+    { type: 'lost_item', id: item.id }
+  );
+}
+
+export async function rejectItemApi(id: string): Promise<void> {
+  const { error } = await supabase.from('lost_items').delete().eq('id', id);
   if (error) throw new Error(error.message);
 }
 
@@ -365,53 +453,23 @@ export async function fetchAppAnalyticsApi(): Promise<AppAnalyticsEvent[]> {
 // ==========================================
 // EXPO PUSH NOTIFICATIONS
 // ==========================================
-async function broadcastPushToAllDevices(title: string, body: string, dataPayload?: any) {
+export async function broadcastPushToAllDevices(title: string, body: string, dataPayload?: any) {
   try {
-    const { data: tokenRecords, error } = await supabase.from('push_tokens').select('token');
-    if (error) {
-      console.error('Error fetching push tokens:', error);
-      return;
-    }
-    if (!tokenRecords || tokenRecords.length === 0) return;
+    const res = await fetch('/api/push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title,
+        body,
+        dataPayload: dataPayload || {},
+      }),
+    });
 
-    const validTokens = tokenRecords
-      .map((r) => r.token)
-      .filter((t) => t && (t.startsWith('ExponentPushToken') || t.startsWith('ExpoPushToken')));
-
-    if (validTokens.length === 0) return;
-
-    const messages = validTokens.map((tokenStr) => ({
-      to: tokenStr,
-      sound: 'default',
-      channelId: 'tuvecino_alertas_v2',
-      title,
-      body,
-      data: dataPayload || {},
-    }));
-
-    console.log(`🚀 Preparando envío masivo a ${messages.length} dispositivo(s) en lotes de 10...`);
-    const BATCH_SIZE = 10;
-    const chunks = [];
-    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
-      chunks.push(messages.slice(i, i + BATCH_SIZE));
-    }
-
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      try {
-        await fetch('https://exp.host/--/api/v2/push/send', {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Accept-encoding': 'gzip, deflate',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(chunk),
-        });
-      } catch (batchErr) {
-        console.error(`❌ Error al enviar lote ${i + 1}:`, batchErr);
-      }
-    }
+    const data = await res.json();
+    console.log('📡 Resultado de envío push desde /api/push:', data);
+    return data;
   } catch (err) {
     console.error('Error en broadcastPushToAllDevices:', err);
   }
