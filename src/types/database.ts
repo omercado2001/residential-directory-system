@@ -163,6 +163,8 @@ export type TableName =
   | 'menu_items'
   | 'promotions'
   | 'events'
+  | 'lost_pets'
+  | 'lost_items'
   | 'emergency_contacts'
   | 'user_favorites'
   | 'profiles'

@@ -18,6 +18,8 @@ export interface BackupData {
     promotions: any[];
     events: any[];
     emergency_contacts: any[];
+    lost_pets: any[];
+    lost_items: any[];
     profiles: any[];
     system_users: any[];
     user_favorites: any[];
@@ -34,6 +36,8 @@ export async function fetchFullDatabaseBackup(): Promise<BackupData> {
     { data: promotions },
     { data: events },
     { data: emergency_contacts },
+    { data: lost_pets },
+    { data: lost_items },
     { data: profiles },
     { data: system_users },
     { data: user_favorites },
@@ -46,6 +50,8 @@ export async function fetchFullDatabaseBackup(): Promise<BackupData> {
     supabase.from('promotions').select('*').order('created_at', { ascending: false }),
     supabase.from('events').select('*').order('created_at', { ascending: false }),
     supabase.from('emergency_contacts').select('*').order('sort_order', { ascending: true }),
+    supabase.from('lost_pets').select('*').order('created_at', { ascending: false }),
+    supabase.from('lost_items').select('*').order('created_at', { ascending: false }),
     supabase.from('profiles').select('*').order('created_at', { ascending: false }),
     supabase.from('system_users').select('*').order('created_at', { ascending: false }),
     supabase.from('user_favorites').select('*'),
@@ -60,6 +66,8 @@ export async function fetchFullDatabaseBackup(): Promise<BackupData> {
     promotions: promotions || [],
     events: events || [],
     emergency_contacts: emergency_contacts || [],
+    lost_pets: lost_pets || [],
+    lost_items: lost_items || [],
     profiles: profiles || [],
     system_users: system_users || [],
     user_favorites: user_favorites || [],
@@ -135,6 +143,9 @@ export function downloadSqlBackup(backup: BackupData, filenamePrefix = 'Backup_D
   sql += generateTableSql('menu_items', backup.database.menu_items);
   sql += generateTableSql('promotions', backup.database.promotions);
   sql += generateTableSql('events', backup.database.events);
+  sql += generateTableSql('emergency_contacts', backup.database.emergency_contacts);
+  sql += generateTableSql('lost_pets', backup.database.lost_pets);
+  sql += generateTableSql('lost_items', backup.database.lost_items);
   sql += generateTableSql('profiles', backup.database.profiles);
   sql += generateTableSql('system_users', backup.database.system_users);
   sql += generateTableSql('user_favorites', backup.database.user_favorites);

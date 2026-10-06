@@ -217,7 +217,9 @@ export default function OverviewModule({
   };
 
   const chartDays = useMemo(() => {
-    return [...stats.dailyBreakdown].sort((a, b) => a.date.localeCompare(b.date));
+    return [...stats.dailyBreakdown]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-15);
   }, [stats.dailyBreakdown]);
 
   return (
@@ -466,17 +468,19 @@ export default function OverviewModule({
                           className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer h-full justify-end"
                           title={`${formatDayName(d.date)}: ${d.total} consultas`}
                         >
-                          <div
-                            className={`w-full rounded-t-lg transition-all duration-300 relative ${
-                              isSelected
-                                ? 'bg-indigo-600 ring-2 ring-indigo-400'
-                                : 'bg-blue-600 group-hover:bg-blue-500'
-                            }`}
-                            style={{ height: `${heightPercent}%` }}
-                          >
-                            <span className="opacity-0 group-hover:opacity-100 transition absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-md whitespace-nowrap pointer-events-none z-10">
-                              {d.total} consultas
-                            </span>
+                          <div className="w-full flex-1 flex flex-col justify-end">
+                            <div
+                              className={`w-full rounded-t-lg transition-all duration-300 relative ${
+                                isSelected
+                                  ? 'bg-indigo-600 ring-2 ring-indigo-400'
+                                  : 'bg-blue-600 group-hover:bg-blue-500'
+                              }`}
+                              style={{ height: `${heightPercent}%` }}
+                            >
+                              <span className="opacity-0 group-hover:opacity-100 transition absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-black px-2 py-0.5 rounded shadow-md whitespace-nowrap pointer-events-none z-10">
+                                {d.total} consultas
+                              </span>
+                            </div>
                           </div>
                           <span className={`text-[10px] font-mono font-bold transition truncate max-w-full ${
                             isSelected ? 'text-indigo-700 font-black' : 'text-slate-500 group-hover:text-blue-600'

@@ -440,7 +440,7 @@ export async function fetchAppAnalyticsApi(): Promise<AppAnalyticsEvent[]> {
       .select('*')
       .eq('platform', 'android')
       .order('created_at', { ascending: false })
-      .limit(1000);
+      .limit(50000);
 
     if (error) return [];
     return data || [];
